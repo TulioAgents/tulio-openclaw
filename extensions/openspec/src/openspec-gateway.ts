@@ -2,8 +2,18 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk/core";
 import type { OpenClawPluginApi } from "../runtime-api.js";
-import { resolveChangesDir, readStatusYaml } from "./openspec-tool.js";
-import type { OpenSpecAgentStatus, OpenSpecChange, OpenSpecProject } from "./openspec-types.js";
+import {
+  resolveChangesDir,
+  readStatusYaml,
+  readTaskTracker,
+  listTaskFiles,
+} from "./openspec-tool.js";
+import type {
+  OpenSpecAgentStatus,
+  OpenSpecChange,
+  OpenSpecProject,
+  TaskTrackerEntry,
+} from "./openspec-types.js";
 import {
   readProjectMap,
   resolveProjectMapPath,
@@ -154,7 +164,63 @@ export function createOpenSpecGatewayHandlers(api: OpenClawPluginApi) {
         return;
       }
       const artifacts = await readChangeArtifacts(location, changeId);
-      opts.respond(true, { change, artifacts });
+      // Include task summary for dashboard rendering
+      const changeDir = path.join(resolveChangesDir(location), changeId);
+      const tracker = await readTaskTracker(changeDir);
+      const tasks: TaskTrackerEntry[] =
+        tracker?.tasks ??
+        (await listTaskFiles(changeDir).then((ts) =>
+          ts.map((t) => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            assignee: t.assignee,
+            role: t.role,
+            owner: t.owner,
+            reviewer: t.reviewer,
+            priority: t.priority,
+            dependsOn: t.dependsOn,
+          })),
+        ));
+      opts.respond(true, { change, artifacts, tasks });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      opts.respond(false, undefined, { code: "openspec.error", message });
+    }
+  };
+
+  /** openspec.tasks.list — returns task tracker entries for a change (fast path via tasks-tracker.yaml) */
+  const handleTasksList = async (opts: GatewayRequestHandlerOptions): Promise<void> => {
+    const projectCode =
+      typeof opts.params.projectCode === "string" ? opts.params.projectCode.trim() : "";
+    const changeId = typeof opts.params.changeId === "string" ? opts.params.changeId.trim() : "";
+
+    if (!projectCode || !changeId) {
+      opts.respond(false, undefined, {
+        code: "openspec.missing_param",
+        message: "projectCode and changeId are required",
+      });
+      return;
+    }
+    try {
+      const location = await resolveProjectLocation(api, projectCode);
+      if (!location) {
+        opts.respond(false, undefined, {
+          code: "openspec.not_found",
+          message: `Project ${projectCode} not found`,
+        });
+        return;
+      }
+      const changeDir = path.join(resolveChangesDir(location), changeId);
+      // Fast path: tracker YAML
+      const tracker = await readTaskTracker(changeDir);
+      if (tracker && tracker.tasks.length > 0) {
+        opts.respond(true, { tasks: tracker.tasks, source: "tracker" });
+        return;
+      }
+      // Fallback: parse individual task files
+      const tasks = await listTaskFiles(changeDir);
+      opts.respond(true, { tasks, source: "files" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       opts.respond(false, undefined, { code: "openspec.error", message });
@@ -182,5 +248,6 @@ export function createOpenSpecGatewayHandlers(api: OpenClawPluginApi) {
     handleChangesList,
     handleChangesDetail,
     handleAgentsStatus,
+    handleTasksList,
   };
 }

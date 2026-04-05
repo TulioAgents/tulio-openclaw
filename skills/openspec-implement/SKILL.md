@@ -52,8 +52,11 @@ Read:
 
 - `openspec/changes/<change-id>/proposal.md` — what to build
 - `openspec/changes/<change-id>/design.md` — how to build it
-- `openspec/changes/<change-id>/tasks.md` — your specific task(s)
+- `openspec/changes/<change-id>/tasks-tracker.yaml` — quick task status overview
+- `openspec/changes/<change-id>/tasks/Phase{X}-T{X}.{Y}.md` — your specific task file(s) with full details, acceptance criteria, and activity log
 - `openspec/changes/<change-id>/handoff.md` — current state
+
+Use `openspec_task(task_list)` to see all tasks and their current status at a glance.
 
 ### 2. Confirm scope and worktree
 
@@ -104,7 +107,8 @@ Write `openspec/changes/<change-id>/handoff.md`:
 
 ## Done when
 
-- [ ] All assigned tasks in `tasks.md` marked `done`
+- [ ] All assigned task files in `tasks/` marked `done` via `openspec_task(task_update, status: "done")`
+- [ ] `tasks-tracker.yaml` reflects current status for all tasks
 - [ ] Tests written and passing
 - [ ] No silent API or schema changes without team notification
 - [ ] Handoff updated pointing to @qa-engineer

@@ -165,6 +165,7 @@ export const zh_CN: TranslationMap = {
     debug: "调试",
     logs: "日志",
     dreams: "梦境",
+    projects: "项目",
   },
   subtitles: {
     agents: "工作区、工具、身份。",
@@ -186,6 +187,7 @@ export const zh_CN: TranslationMap = {
     debug: "快照、事件、RPC。",
     logs: "实时网关日志。",
     dreams: "睡眠时进行记忆巩固。",
+    projects: "变更、任务和代理协调。",
   },
   overview: {
     access: {

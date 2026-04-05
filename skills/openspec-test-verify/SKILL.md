@@ -104,7 +104,25 @@ If verification fails:
 - Record escaped defect in `.ai/shared-memory/mistake-log.md`
 - Do NOT give deployment signoff
 
-### 6. Give signoff
+### 6. Update verification task files
+
+Mark verification tasks done and add QA activity log entries:
+
+```
+openspec_task({ action: "task_update", changeId: "...", id: "V1", status: "done" })
+openspec_task({ action: "task_comment", changeId: "...", id: "V1",
+  role: "qa-engineer", content: "Verification passed. All criteria met." })
+```
+
+If a bug is found during verification, report it on the relevant task before reassigning:
+
+```
+openspec_task({ action: "task_bug", changeId: "...", id: "T2.1",
+  bugId: "BUG-001", title: "Short bug title", severity: "high",
+  reportedBy: "qa-engineer", description: "...", reproduction: "..." })
+```
+
+### 7. Give signoff
 
 If all criteria pass:
 
@@ -118,6 +136,7 @@ Update `lessons-learned.md` if a reusable quality insight emerged.
 
 - [ ] All acceptance criteria traced to a test or manual check
 - [ ] Evidence documented per criterion
+- [ ] Verification task files updated with status `done` via `openspec_task`
 - [ ] Deployment signoff is YES or NO with clear reason
 - [ ] Handoff updated with next owner (@devops)
 

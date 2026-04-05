@@ -39,14 +39,20 @@ projects:
     status: active
 ```
 
-### 3. Initialize OpenSpec in your project
+### 3. Initialize git and OpenSpec in your project
 
 ```bash
 cd ~/coding-projects/my-app
+
+# Initialize git repo (required for worktrees)
+openspec_projects({ action: "git_init", projectCode: "my-app" })
+# → creates repo on 'main', adds .gitignore, makes initial commit
+
+# Initialize OpenSpec structure
 openspec init
 ```
 
-This creates `openspec/` structure and `.claude/skills/` for AI assistant integration.
+`git_init` is idempotent — safe to call on an existing repo (returns `alreadyInitialized: true`).
 
 ### 4. Scaffold shared memory
 
@@ -118,7 +124,13 @@ openspec/
       status.yaml                 # machine-readable phase state (authoritative)
       proposal.md                 # problem, user story, acceptance criteria
       design.md                   # API contracts, schema, component architecture
-      tasks.md                    # task list with owners and status
+      tasks.md                    # index table linking to individual task files
+      tasks-tracker.yaml          # fast status index — all tasks in one file
+      tasks/                      # one file per task
+        Phase1-T1.1.md            # YAML frontmatter + description + activity log + bugs
+        Phase2-T2.1.md
+        Phase{X}-T{X}.{Y}.md
+        TEMPLATE.md               # template for new task files
       handoff.md                  # current baton between agents
       verification.md             # acceptance criteria trace + QA signoff
       release.md                  # deployment summary and monitoring results
@@ -126,8 +138,93 @@ openspec/
   _template/                      # scaffold for new changes
 ```
 
-Change IDs follow the pattern: `<project-code>-<feature>-<YYYYMMDD>`
-Example: `acme-billing-retry-20240315`
+### `status.yaml` format
+
+```yaml
+changeId: "0001-feature-name"
+title: "Feature Name"
+phase: "implementation" # idea|proposal|plan|design|implementation|verification|deployment|done|blocked
+owner: "dev-manager"
+assignees:
+  sr-fullstack: "claudecoder"
+  qa-engineer: ""
+blockers: []
+branch: "feat/0001-feature-name"
+createdAt: 1743840000000 # Unix ms
+updatedAt: 1743854400000
+flowId: "flow-0001-feature-name"
+projectCode: "my-project"
+```
+
+### `tasks-tracker.yaml` format
+
+Fast status index read by the gateway dashboard. Updated atomically by `openspec_task` whenever a task changes.
+
+```yaml
+changeId: "0001-feature-name"
+updatedAt: "2026-04-05T12:00:00Z"
+tasks:
+  - id: T1.1
+    title: Initialize project scaffold
+    status: done # todo|in_progress|blocked|in_review|done
+    assignee: claudecoder
+    role: devops
+    owner: dev-manager
+    reviewer: tech-lead
+    priority: high # low|medium|high|critical
+    dependsOn: []
+  - id: T2.1
+    title: Implement core feature
+    status: in_progress
+    assignee: claudecoder
+    role: sr-fullstack
+    owner: dev-manager
+    reviewer: tech-lead
+    priority: high
+    dependsOn: [T1.1]
+```
+
+### Individual task file format (`tasks/Phase{X}-T{X}.{Y}.md`)
+
+Each task file has YAML frontmatter + structured markdown sections:
+
+```markdown
+---
+id: "T2.1"
+title: "Implement src/App.tsx"
+phase: "Phase 2: Application Code"
+status: todo # todo|in_progress|blocked|in_review|done
+priority: medium
+assignee: "" # agent currently executing
+role: "sr-fullstack" # required role
+owner: "dev-manager" # who created/manages this task
+reviewer: "" # who reviews completed work
+depends_on: ["T1.1"]
+blocked_by: []
+created_at: "2026-04-05T10:00:00Z"
+updated_at: "2026-04-05T10:00:00Z"
+started_at: ""
+completed_at: ""
+estimated_effort: "1h"
+---
+
+# T2.1 — Implement src/App.tsx
+
+## Description
+
+## Acceptance Criteria
+
+## Technical Notes
+
+## Files
+
+## Activity Log ← agents append JIRA-style comments here on handoff
+
+## Bugs ← bug reports with severity, reproduction steps, fix status
+```
+
+Change IDs follow the pattern: `<NNNN>-<feature-slug>`
+Example: `0001-name-capture-greeting-display`
 
 ---
 
@@ -142,8 +239,10 @@ Every agent — regardless of role — runs this sequence before taking any acti
 3. Read .ai/shared-memory/current-focus.md
 4. Read decision-log, mistake-log, lessons-learned
 5. Read openspec/specs/ and openspec/changes/ inventory
-6. Read the active change's handoff.md
-7. Confirm branch and worktree
+6. Read the active change's status.yaml     ← authoritative phase
+7. Read the active change's handoff.md      ← current baton
+8. Read tasks-tracker.yaml (or openspec_task task_list) ← task status at a glance
+9. Confirm branch and worktree
          ↓
    Only now: plan or act
 ```
@@ -154,17 +253,17 @@ Spawned sub-agents receive no parent session state. They must self-recover from 
 
 ## Roles and responsibilities
 
-| Role                 | Owns                                                    | Key writes                                            |
-| -------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
-| **CTO**              | Technical strategy, escalation, cross-project oversight | `decision-log.md`, architectural guidance             |
-| **Dev Manager**      | Change routing, OpenSpec lifecycle, handoffs            | `current-focus.md`, `handoff-index.md`, `status.yaml` |
-| **Product Owner**    | Requirements, acceptance criteria, scope                | `proposal.md`, `project-context.md`                   |
-| **Tech Lead**        | Architecture, design decisions, risks                   | `design.md`, `decision-log.md`, `project-risks.md`    |
-| **Staff Fullstack**  | Architecture ownership, code review, mentoring          | Review feedback, architectural guidance               |
-| **Sr. Fullstack**    | Feature implementation, tests, PRs                      | Code, tests, `handoff.md`, `mistake-log.md`           |
-| **Mobile Developer** | Flutter/mobile implementation                           | Mobile code, build configs                            |
-| **QA Engineer**      | Verification, acceptance criteria tracing, signoff      | `verification.md`, `lessons-learned.md`               |
-| **DevOps**           | GCP infrastructure, CI/CD, deployment                   | `release.md`, Terraform, Cloud Run config             |
+| Role                 | Owns                                                    | Key writes                                                                                 |
+| -------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **CTO**              | Technical strategy, escalation, cross-project oversight | `decision-log.md`, architectural guidance                                                  |
+| **Dev Manager**      | Change routing, OpenSpec lifecycle, handoffs            | `current-focus.md`, `handoff-index.md`, `status.yaml`, `tasks-tracker.yaml` (via tool)     |
+| **Product Owner**    | Requirements, acceptance criteria, scope                | `proposal.md`, `project-context.md`                                                        |
+| **Tech Lead**        | Architecture, design decisions, risks                   | `design.md`, `decision-log.md`, `project-risks.md`                                         |
+| **Staff Fullstack**  | Architecture ownership, code review, mentoring          | Review feedback, architectural guidance                                                    |
+| **Sr. Fullstack**    | Feature implementation, tests, PRs                      | Code, tests, `handoff.md`, `mistake-log.md`, task file activity logs (via `openspec_task`) |
+| **Mobile Developer** | Flutter/mobile implementation                           | Mobile code, build configs                                                                 |
+| **QA Engineer**      | Verification, acceptance criteria tracing, signoff      | `verification.md`, `lessons-learned.md`                                                    |
+| **DevOps**           | GCP infrastructure, CI/CD, deployment                   | `release.md`, Terraform, Cloud Run config                                                  |
 
 Each role is defined as an OpenClaw agent workspace under the assembled directories. The shared team topology is in `dev-team-agents/shared/TEAM_TOPOLOGY.md`.
 
@@ -206,32 +305,59 @@ All workflow skills use the installed `openspec` CLI (`@fission-ai/openspec`) fo
 
 ## The `openspec_change` tool
 
-The plugin registers this tool so agents can manage changes programmatically rather than through file edits alone:
+Manages change lifecycle. Agents must use this tool — do not edit `status.yaml` directly.
 
 ```
-openspec_change(action: "create",    projectCode, changeId, title)
+openspec_change(action: "create",     projectCode, changeId, title)
 openspec_change(action: "transition", changeId, toPhase)
-openspec_change(action: "assign",    changeId, role, sessionKey)
-openspec_change(action: "block",     changeId, blocker)
-openspec_change(action: "unblock",   changeId, blocker)
-openspec_change(action: "handoff",   changeId, from, to, summary, nextStep)
-openspec_change(action: "status",    changeId)
+openspec_change(action: "assign",     changeId, role, sessionKey)
+openspec_change(action: "block",      changeId, blocker)
+openspec_change(action: "unblock",    changeId, blocker)
+openspec_change(action: "handoff",    changeId, from, to, summary, nextStep)
+openspec_change(action: "status",     changeId)
 ```
 
-Phase transition guards are enforced by the tool — invalid transitions return an error:
+Phase transition guards — the tool rejects invalid transitions:
 
-- `design` requires `proposal.md` to exist
-- `implementation` requires `design.md` + `tasks.md`
-- `verification` requires a non-empty `handoff.md`
-- `deployment` requires `verification.md` containing `Signoff: YES`
+| Transition to    | Requires                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `plan`           | `proposal.md` with content                                                            |
+| `design`         | `proposal.md` with content                                                            |
+| `implementation` | `design.md` with content + (`tasks.md` with content OR at least one file in `tasks/`) |
+| `verification`   | non-empty `handoff.md`                                                                |
+| `deployment`     | `verification.md` containing `Signoff: YES`                                           |
 
-The `openspec_projects` tool reads the project registry and shared-memory:
+## The `openspec_task` tool
+
+Manages individual task files and keeps `tasks-tracker.yaml` in sync. Always use this tool — do not edit task files or `tasks-tracker.yaml` directly.
+
+```
+openspec_task(action: "task_create",  changeId, id, title, phase, role, owner,
+                                      reviewer?, assignee?, priority?, dependsOn?, estimatedEffort?)
+openspec_task(action: "task_update",  changeId, id, status?, assignee?, reviewer?, priority?, blockedBy?)
+openspec_task(action: "task_comment", changeId, id, role, content)
+openspec_task(action: "task_bug",     changeId, id, bugId, title, severity, reportedBy, description, reproduction?)
+openspec_task(action: "task_list",    changeId)
+```
+
+**Key rules:**
+
+- `task_create` creates `tasks/Phase{X}-T{X}.{Y}.md` and adds the entry to `tasks-tracker.yaml`
+- `task_update` updates the task file frontmatter and syncs `tasks-tracker.yaml`
+- `task_comment` appends a timestamped entry to the Activity Log section (use on every handoff)
+- `task_bug` appends a bug report to the Bugs section (use before assigning to a dev)
+- `task_list` reads `tasks-tracker.yaml` first (fast), falls back to parsing individual files
+
+The `openspec_projects` tool reads the project registry, shared-memory, and initializes git:
 
 ```
 openspec_projects(action: "list")
 openspec_projects(action: "context", projectCode)
 openspec_projects(action: "changes", projectCode)
+openspec_projects(action: "git_init", projectCode, defaultBranch?)
 ```
+
+`git_init` — initializes a git repo in the project directory, creates `.gitignore`, and makes an initial commit so worktrees have a valid base. Idempotent — safe to call on repos that already exist. Always call this before creating the first worktree for a project.
 
 ---
 
@@ -278,12 +404,13 @@ Below the board: a live table of all active OpenSpec agents showing role, curren
 
 The plugin exposes these WebSocket methods used by the dashboard:
 
-| Method                    | Description                                                  |
-| ------------------------- | ------------------------------------------------------------ |
-| `openspec.projects.list`  | All projects from project-map.yaml with active change counts |
-| `openspec.changes.list`   | Changes for a project with phase, owner, status              |
-| `openspec.changes.detail` | Full change detail with child tasks and artifact content     |
-| `openspec.agents.status`  | Live OpenSpec agent sessions (stub — see known gaps)         |
+| Method                    | Description                                                                |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `openspec.projects.list`  | All projects from project-map.yaml with active change counts               |
+| `openspec.changes.list`   | Changes for a project with phase, owner, status                            |
+| `openspec.changes.detail` | Full change detail + task summary (reads `tasks-tracker.yaml`) + artifacts |
+| `openspec.tasks.list`     | Task tracker entries for a change (fast path via `tasks-tracker.yaml`)     |
+| `openspec.agents.status`  | Live OpenSpec agent sessions (stub — see known gaps)                       |
 
 ---
 
@@ -377,10 +504,10 @@ ui-design/                  openspec-handoff/
 ### Plugin (`extensions/openspec/`)
 
 ```
-openclaw.plugin.json        src/openspec-types.ts
-package.json                src/openspec-tool.ts
+openclaw.plugin.json        src/openspec-types.ts   ← OpenSpecTask, TaskTracker types
+package.json                src/openspec-tool.ts    ← openspec_change + openspec_task tools
 index.ts                    src/projects-tool.ts
-api.ts                      src/openspec-gateway.ts
+api.ts                      src/openspec-gateway.ts ← openspec.tasks.list gateway method
 runtime-api.ts
 ```
 
@@ -403,9 +530,91 @@ views/projects-types.ts     controllers/projects.ts
 openspec/
   specs/README.md
   changes/_template/
-    status.yaml   proposal.md   design.md   tasks.md
-    handoff.md    verification.md           release.md
+    status.yaml           proposal.md     design.md
+    tasks.md              tasks-tracker.yaml
+    tasks/
+      TEMPLATE.md         ← copy and rename for each new task
+    handoff.md            verification.md  release.md
 ```
+
+---
+
+## Task workflow cheatsheet
+
+### Planning phase (dev-manager / tech-lead)
+
+```
+# 0. Ensure git repo exists (required for worktrees — idempotent)
+openspec_projects({ action: "git_init", projectCode: "my-app" })
+
+# 1. Create the change
+openspec_change({ action: "create", projectCode: "my-app", changeId: "0001-feature", title: "Feature Name" })
+
+# 2. Transition to plan
+openspec_change({ action: "transition", changeId: "0001-feature", toPhase: "plan" })
+
+# 3. Create individual task files (one per task)
+openspec_task({ action: "task_create", changeId: "0001-feature",
+  id: "T1.1", title: "Scaffold project", phase: "Phase 1: Scaffold",
+  role: "devops", owner: "dev-manager", reviewer: "tech-lead",
+  priority: "high", dependsOn: [], estimatedEffort: "30m" })
+
+openspec_task({ action: "task_create", changeId: "0001-feature",
+  id: "T2.1", title: "Implement feature", phase: "Phase 2: Application Code",
+  role: "sr-fullstack", owner: "dev-manager", reviewer: "tech-lead",
+  priority: "high", dependsOn: ["T1.1"], estimatedEffort: "2h" })
+
+# tasks/Phase1-T1.1.md and tasks/Phase2-T2.1.md are created
+# tasks-tracker.yaml is updated automatically
+```
+
+### Implementation phase (sr-fullstack)
+
+```
+# Check what tasks are assigned to you
+openspec_task({ action: "task_list", changeId: "0001-feature" })
+
+# Claim a task (start working)
+openspec_task({ action: "task_update", changeId: "0001-feature", id: "T2.1",
+  status: "in_progress", assignee: "claudecoder" })
+
+# Log progress in the activity log
+openspec_task({ action: "task_comment", changeId: "0001-feature", id: "T2.1",
+  role: "sr-fullstack", content: "Started implementation. Component structure decided." })
+
+# Report a bug before assigning back
+openspec_task({ action: "task_bug", changeId: "0001-feature", id: "T2.1",
+  bugId: "BUG-001", title: "Input loses focus on re-render", severity: "medium",
+  reportedBy: "sr-fullstack", description: "Input loses focus when typing quickly.",
+  reproduction: "Type 5+ characters fast in the input field." })
+
+# Mark done
+openspec_task({ action: "task_update", changeId: "0001-feature", id: "T2.1", status: "done" })
+```
+
+### Handoff (any role → next role)
+
+```
+# 1. Update task with final status + comment
+openspec_task({ action: "task_update", changeId: "0001-feature", id: "T2.1", status: "done" })
+openspec_task({ action: "task_comment", changeId: "0001-feature", id: "T2.1",
+  role: "sr-fullstack", content: "Implementation complete. Tests passing. Ready for QA." })
+
+# 2. Write handoff.md
+openspec_change({ action: "handoff", changeId: "0001-feature",
+  from: "sr-fullstack", to: "qa-engineer",
+  summary: "Feature implemented, all tests pass.",
+  nextStep: "Run verification against acceptance criteria in proposal.md" })
+```
+
+### Rule: always use the tools, never edit files directly
+
+| File                         | How to modify                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| `status.yaml`                | `openspec_change(action: "transition" \| "assign" \| "block" \| ...)`          |
+| `tasks-tracker.yaml`         | `openspec_task(action: "task_create" \| "task_update")` — synced automatically |
+| `tasks/Phase{X}-T{X}.{Y}.md` | `openspec_task(action: "task_update" \| "task_comment" \| "task_bug")`         |
+| `handoff.md`                 | `openspec_change(action: "handoff", ...)`                                      |
 
 ---
 

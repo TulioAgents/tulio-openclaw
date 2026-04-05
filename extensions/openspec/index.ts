@@ -5,7 +5,7 @@ import {
   type OpenClawPluginServiceContext,
 } from "openclaw/plugin-sdk/plugin-entry";
 import { createOpenSpecGatewayHandlers } from "./src/openspec-gateway.js";
-import { createOpenSpecChangeTool } from "./src/openspec-tool.js";
+import { createOpenSpecChangeTool, createOpenSpecTaskTool } from "./src/openspec-tool.js";
 import { createOpenSpecProjectsTool } from "./src/projects-tool.js";
 
 function createOpenSpecService(): OpenClawPluginService {
@@ -29,6 +29,9 @@ export default definePluginEntry({
     // Register the openspec_change tool for agents
     api.registerTool(createOpenSpecChangeTool(api) as AnyAgentTool);
 
+    // Register the openspec_task tool for agents
+    api.registerTool(createOpenSpecTaskTool(api) as AnyAgentTool);
+
     // Register the openspec_projects tool for agents
     api.registerTool(createOpenSpecProjectsTool(api) as AnyAgentTool);
 
@@ -44,6 +47,9 @@ export default definePluginEntry({
       scope: "operator.read",
     });
     api.registerGatewayMethod("openspec.agents.status", gatewayHandlers.handleAgentsStatus, {
+      scope: "operator.read",
+    });
+    api.registerGatewayMethod("openspec.tasks.list", gatewayHandlers.handleTasksList, {
       scope: "operator.read",
     });
 

@@ -90,9 +90,22 @@ pending | in-progress | passed | failed
 - Tasks: `openspec/changes/<change-id>/tasks.md`
 ```
 
-### 4. Update tasks.md
+### 4. Update task files
 
-Mark completed tasks as `done` in `tasks.md`.
+Use `openspec_task(task_update)` to mark completed tasks as `done` and to add your assignee/reviewer:
+
+```
+openspec_task({ action: "task_update", changeId: "<change-id>", id: "T2.1", status: "done" })
+```
+
+Add a handoff activity log entry to each task you completed:
+
+```
+openspec_task({ action: "task_comment", changeId: "<change-id>", id: "T2.1",
+  role: "<your-role>", content: "Implementation complete. <summary of what was done>" })
+```
+
+This updates both the task file and `tasks-tracker.yaml` automatically. Also update the index table in `tasks.md`.
 
 ### 5. Update handoff-index
 
@@ -117,7 +130,9 @@ Update `.ai/shared-memory/handoff-index.md` with the new entry.
 - [ ] Files changed are listed
 - [ ] Decisions recorded
 - [ ] Next owner is named
-- [ ] `tasks.md` updated
+- [ ] Task files updated via `openspec_task(task_update)` with current status
+- [ ] Activity log entries added to completed tasks
+- [ ] `tasks-tracker.yaml` reflects current status
 - [ ] `handoff-index.md` updated
 
 ## Rules

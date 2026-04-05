@@ -1,0 +1,16 @@
+# tasks-tracker.yaml — fast status index for all tasks in this change
+# Agents: update this file atomically whenever you change a task's status, assignee, or other fields.
+# The gateway reads this file for the kanban board instead of parsing every individual task file.
+changeId: ""
+updatedAt: ""
+tasks: []
+# Example entry:
+#  - id: T1.1
+#    title: Initialize project
+#    status: todo        # todo | in_progress | blocked | in_review | done
+#    assignee: ""        # agent currently executing
+#    role: devops        # required role
+#    owner: dev-manager  # who manages the task
+#    reviewer: ""        # who reviews before done
+#    priority: high      # low | medium | high | critical
+#    depends_on: []

@@ -1,6 +1,6 @@
 ---
 name: openspec-plan-change
-description: Scaffold and plan a change using the OpenSpec CLI. Generates the change folder, tasks.md, and handoff via /opsx:new or /opsx:continue. Use after a proposal exists and you need to break work into assignable tasks.
+description: Scaffold and plan a change using the OpenSpec CLI. Generates the change folder, individual task files under tasks/, tasks-tracker.yaml, and handoff. Use after a proposal exists and you need to break work into assignable tasks.
 metadata: { "openclaw": { "emoji": "📋" } }
 ---
 
@@ -60,9 +60,37 @@ Or fast-forward all remaining planning artifacts at once (expanded profile):
 /opsx:ff         # generates all remaining artifacts in sequence
 ```
 
-### 4. Assign owners and set up worktree
+### 4. Create individual task files
 
-Review the generated `tasks.md` and assign roles:
+For each task in the plan, use `openspec_task(task_create)` to create a file under `openspec/changes/<change-id>/tasks/`:
+
+```
+openspec_task({
+  action: "task_create",
+  changeId: "<change-id>",
+  id: "T2.1",
+  title: "Implement src/App.tsx",
+  phase: "Phase 2: Application Code",
+  role: "sr-fullstack",
+  owner: "dev-manager",
+  reviewer: "tech-lead",
+  priority: "medium",
+  dependsOn: ["T1.1"],
+  estimatedEffort: "1h"
+})
+```
+
+This creates `tasks/Phase2-T2.1.md` and updates `tasks-tracker.yaml` automatically.
+
+Update `tasks.md` to serve as an index table referencing each task file:
+
+| #    | Task               | Role   | Assignee | Status | File                                   |
+| ---- | ------------------ | ------ | -------- | ------ | -------------------------------------- |
+| T1.1 | Initialize project | devops |          | todo   | [Phase1-T1.1.md](tasks/Phase1-T1.1.md) |
+
+### 5. Assign owners and set up worktree
+
+Review the task files and assign roles:
 
 | Situation                  | Assign to      |
 | -------------------------- | -------------- |
@@ -72,13 +100,27 @@ Review the generated `tasks.md` and assign roles:
 | Architecture design needed | @tech-lead     |
 | Requirements unclear       | @product-owner |
 
-Set up one worktree per change (use `git-worktree-discipline` skill):
+**First, ensure the project directory is a git repo** (required for worktrees). If the project was just created or you are unsure:
+
+```
+openspec_projects({ action: "git_init", projectCode: "<project-code>" })
+```
+
+This is idempotent — safe to call even if git is already initialized. It will return `alreadyInitialized: true` and do nothing if the repo exists.
+
+Then set up one worktree per change (use `git-worktree-discipline` skill):
 
 ```bash
 git worktree add .worktrees/<change-id> -b feat/<change-id>
 ```
 
-### 5. Update shared memory
+Assign the worktree path to the first task owner:
+
+```
+openspec_change({ action: "assign", changeId: "<change-id>", role: "<role>", sessionKey: "<agent-session-key>" })
+```
+
+### 6. Update shared memory
 
 Update `.ai/shared-memory/current-focus.md`:
 
@@ -91,7 +133,7 @@ Update `.ai/shared-memory/current-focus.md`:
   worktree: <project-root>/.worktrees/<change-id>
 ```
 
-### 6. Initialize handoff
+### 7. Initialize handoff
 
 Write `openspec/changes/<change-id>/handoff.md` pointing to the first task owner with:
 
@@ -101,7 +143,9 @@ Write `openspec/changes/<change-id>/handoff.md` pointing to the first task owner
 
 ## Done when
 
-- [ ] `tasks.md` exists with named owners and sequence
+- [ ] Individual task files exist under `tasks/` (one per task)
+- [ ] `tasks-tracker.yaml` populated with all tasks
+- [ ] `tasks.md` updated as index table with links to task files
 - [ ] Worktree created and branch set
 - [ ] `handoff.md` initialized with first owner
 - [ ] `current-focus.md` updated

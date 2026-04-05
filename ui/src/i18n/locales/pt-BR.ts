@@ -166,6 +166,7 @@ export const pt_BR: TranslationMap = {
     debug: "Depuração",
     logs: "Logs",
     dreams: "Sonhos",
+    projects: "Projetos",
   },
   subtitles: {
     agents: "Espaços, ferramentas, identidades.",
@@ -187,6 +188,7 @@ export const pt_BR: TranslationMap = {
     debug: "Snapshots, eventos, RPC.",
     logs: "Logs ao vivo do gateway.",
     dreams: "Consolidação de memória durante o sono.",
+    projects: "Mudanças, tarefas e coordenação de agentes.",
   },
   overview: {
     access: {
