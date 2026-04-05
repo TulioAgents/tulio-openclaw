@@ -13,7 +13,7 @@ export interface OpenSpecProject {
   projectCode: string;
   projectName: string;
   location: string;
-  status: "active" | "discovery" | "paused";
+  status: "active" | "discovery" | "paused" | "closed";
   activeChanges: number;
 }
 
@@ -52,15 +52,16 @@ export interface OpenSpecBoardData {
   agents: OpenSpecAgentStatus[];
 }
 
+/** Canonical (normalized) project map entry — all fields resolved from raw YAML. */
 export interface ProjectMapEntry {
   projectName: string;
   projectCode: string;
   location: string;
-  status: "active" | "discovery" | "paused";
+  status: "active" | "discovery" | "paused" | "closed";
 }
 
 export interface ProjectMap {
-  version: number;
-  root: string;
+  version?: number;
+  root?: string;
   projects: ProjectMapEntry[];
 }

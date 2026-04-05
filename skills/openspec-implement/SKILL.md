@@ -21,28 +21,37 @@ npm list -g @fission-ai/openspec || npm install -g @fission-ai/openspec
 - Your task in `tasks.md` is assigned to you and ready to implement
 - Resuming implementation after a handoff
 
-## Do not use when
+## Do not use when — HARD STOP
 
-- `proposal.md` is missing — use `openspec-propose` first
-- `design.md` is required but missing — use `openspec-design-arch` first
-- Acceptance criteria are unclear — return to @product-owner
+These are hard stops. If any condition is true, **stop immediately. Do not write any code. Do not create any files. Report the missing artifact and wait.**
+
+- `proposal.md` is missing or empty → **STOP. The proposal phase has not completed.**
+- `design.md` is missing or empty → **STOP. The design phase has not completed.**
+- `tasks.md` is missing or empty → **STOP. The plan phase has not completed.**
+- `status.yaml` phase is not `"implementation"` → **STOP. The change has not been transitioned to implementation. Do not begin coding.**
+- Gateway sub-agent spawning failed → **STOP. Do not execute this role's work from a parent/orchestrator session.**
 
 ## Steps
 
-### 1. Bootstrap and load spec
+### 1. Bootstrap and verify phase gate
 
-Run the `project-bootstrap` skill, then read:
+Run the `project-bootstrap` skill, then **verify all of the following before touching any code**:
 
 ```bash
 cd <project-root>
-openspec status --change "<change-id>" --json   # confirm artifacts are ready
-openspec instructions specs --change "<change-id>" --json  # review spec instructions
+cat openspec/changes/<change-id>/status.yaml     # phase MUST be "implementation"
+cat openspec/changes/<change-id>/proposal.md     # MUST exist and have content
+cat openspec/changes/<change-id>/design.md       # MUST exist and have content
+cat openspec/changes/<change-id>/tasks.md        # MUST exist and have content
+openspec status --change "<change-id>" --json    # confirm all artifacts ready
 ```
+
+**If `status.yaml` phase is not `"implementation"`, stop here.** Use `openspec_change(transition)` only after the prior phase owner has completed their artifact — do not self-transition.
 
 Read:
 
 - `openspec/changes/<change-id>/proposal.md` — what to build
-- `openspec/changes/<change-id>/design.md` — how to build it (if exists)
+- `openspec/changes/<change-id>/design.md` — how to build it
 - `openspec/changes/<change-id>/tasks.md` — your specific task(s)
 - `openspec/changes/<change-id>/handoff.md` — current state
 

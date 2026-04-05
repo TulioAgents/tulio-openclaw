@@ -39,7 +39,7 @@ export interface OpenSpecProject {
   projectCode: string;
   projectName: string;
   location: string;
-  status: "active" | "discovery" | "paused";
+  status: "active" | "discovery" | "paused" | "closed";
   activeChanges: number;
 }
 

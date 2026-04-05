@@ -27,19 +27,45 @@ openspec init   # first time only
 - The change is already in progress — pick up at the current phase instead
 - You only need one phase — invoke the specific skill directly
 
+## Before starting — mandatory gate
+
+**If `project-map.yaml` has no entry for this project, STOP.** Do not create the project directory, scaffold code, install packages, or run any commands. Ask the human to add the project to `project-map.yaml` first.
+
+**If the project exists but has no active change, STOP.** Call `openspec_change(create)` to register the change at phase `"idea"`, then wait for human confirmation before proceeding to any phase work. Do not infer what to build and start coding.
+
 ## The OpenSpec Lifecycle
 
 ```
-[Idea]
+[Idea]          → create change (phase: idea)
   ↓
-/opsx:propose "<idea>"          → proposal.md, specs/, design.md, tasks.md
+[Proposal]      → product-owner writes proposal.md
+                → transition to "plan" only after proposal.md has content
   ↓
-/opsx:apply                     → implements all tasks in tasks.md
+[Plan]          → dev-manager writes tasks.md, handoff.md
+                → transition to "design" only after tasks.md has content
   ↓
-/opsx:verify (if using expanded profile)
+[Design]        → tech-lead writes design.md
+                → transition to "implementation" only after design.md AND tasks.md have content
   ↓
-/opsx:archive                   → moves to openspec/changes/archive/
+[Implementation]→ sr-fullstack writes code + tests + handoff.md
+                → transition to "verification" only after handoff.md has content
+  ↓
+[Verification]  → qa-engineer writes verification.md with "Signoff: YES"
+                → transition to "deployment" only after "Signoff: YES" in verification.md
+  ↓
+[Deployment]    → devops deploys, writes release.md
+  ↓
+[Done]          → /opsx:archive
 ```
+
+**Each phase gate is enforced by `openspec_change(transition)`. The tool will reject any transition that skips a phase or lacks the required artifact. Agents must not bypass this by writing code or files before the tool permits the transition.**
+
+## Hard rules — no exceptions
+
+- **No code before `implementation` phase.** Writing source files, running `npm init`, scaffolding frameworks, or installing packages before `status.yaml` shows `phase: implementation` is a workflow violation.
+- **No self-delegation.** If sub-agent spawning fails, the orchestrator must report the failure and stop — not execute the missing agent's role itself.
+- **No phase skipping.** Every phase must be entered via `openspec_change(transition)` in order. The tool enforces this; do not work around it.
+- **One role per phase.** The agent assigned to a phase owns only that phase. Do not produce artifacts for a phase you are not assigned to.
 
 ## Steps
 
@@ -101,11 +127,9 @@ Exit criteria:
 
 ### Phase 4: Implement
 
-```bash
-/opsx:apply
-```
+**STOP if `design.md` or `tasks.md` are missing or empty.** Do not begin implementation. Return to the design/plan phase owner.
 
-The CLI reads `tasks.md` and implements each task. Monitor progress and intervene on blockers.
+Spawn `@sr-fullstack` agent via `sessions_spawn`. Do not run `/opsx:apply` yourself from the orchestrator session if sub-agent spawning fails — report the failure instead.
 
 Exit criteria:
 

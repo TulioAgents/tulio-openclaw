@@ -250,6 +250,20 @@ git worktree remove /tmp/issue-99
 
 ---
 
+## ⚠️ OpenSpec gate — read before using this skill
+
+**This skill spawns coding agents that write code and files. Before using it:**
+
+1. Read `~/coding-projects/project-map.yaml` — confirm the target project is registered.
+2. Confirm an active OpenSpec change exists: `openspec/changes/*/status.yaml` must show `phase: implementation`.
+3. If no project entry exists → **STOP. Do not scaffold anything. Tell the user.**
+4. If no active change exists → **STOP. Do not use this skill. Use `openspec_change(create)` first, advance through proposal/plan/design phases, then return here.**
+5. If the change is not in `implementation` phase → **STOP. The phase gates have not been completed. Do not delegate coding work yet.**
+
+The `workdir` passed to the coding agent **must be the registered project location** from `project-map.yaml`, not a scratch directory, not `~/.openclaw/workspace/main`, not a temp path.
+
+---
+
 ## ⚠️ Rules
 
 1. **Use the right execution mode per agent**:

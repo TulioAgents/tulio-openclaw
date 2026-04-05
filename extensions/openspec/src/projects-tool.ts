@@ -39,13 +39,29 @@ function resolveProjectMapPath(api: OpenClawPluginApi): string {
   return expandTilde(rawPath);
 }
 
+/** Normalize a raw project-map entry to canonical field names. */
+function normalizeProjectMapEntry(raw: Record<string, unknown>): ProjectMapEntry {
+  // Support both canonical (projectCode/projectName/location) and legacy (name/path) field names.
+  const location = String(raw.location ?? raw.path ?? "");
+  const projectName = String(raw.projectName ?? raw.name ?? location);
+  const projectCode = String(raw.projectCode ?? raw.name ?? projectName);
+  const status = (raw.status ?? "active") as ProjectMapEntry["status"];
+  return { projectName, projectCode, location, status };
+}
+
 async function readProjectMap(mapPath: string): Promise<ProjectMap> {
   const raw = await fs.readFile(mapPath, "utf8");
   const parsed = parseYaml(raw) as unknown;
   if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) {
     throw new Error(`Invalid project-map.yaml at ${mapPath}`);
   }
-  return parsed as ProjectMap;
+  const rawMap = parsed as { projects?: unknown[] };
+  const projects = Array.isArray(rawMap.projects)
+    ? rawMap.projects
+        .filter((e) => e && typeof e === "object")
+        .map((e) => normalizeProjectMapEntry(e as Record<string, unknown>))
+    : [];
+  return { ...rawMap, projects };
 }
 
 async function countActiveChanges(projectLocation: string): Promise<number> {

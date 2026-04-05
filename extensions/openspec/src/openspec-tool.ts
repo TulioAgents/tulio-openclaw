@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { Type } from "@sinclair/typebox";
 import { z } from "openclaw/plugin-sdk/zod";
+import { parse as parseYaml } from "yaml";
 import type { OpenClawPluginApi } from "../runtime-api.js";
 import type { OpenSpecChange, OpenSpecPhase } from "./openspec-types.js";
 
@@ -76,6 +77,81 @@ type OpenSpecChangeInput = z.infer<typeof OpenSpecChangeInputSchema>;
 
 function resolveWorkspaceDir(api: OpenClawPluginApi): string {
   return (api.config?.agents?.defaults?.workspace ?? process.cwd()).trim();
+}
+
+function resolveProjectMapPath(api: OpenClawPluginApi): string {
+  const raw =
+    typeof api.pluginConfig === "object" &&
+    api.pluginConfig !== null &&
+    "projectMapPath" in api.pluginConfig &&
+    typeof (api.pluginConfig as Record<string, unknown>).projectMapPath === "string"
+      ? ((api.pluginConfig as Record<string, unknown>).projectMapPath as string)
+      : "~/coding-projects/project-map.yaml";
+  return expandTilde(raw);
+}
+
+async function resolveWorkspaceDirForProject(
+  api: OpenClawPluginApi,
+  projectCode: string,
+): Promise<string | null> {
+  // Read project-map.yaml directly — avoids a circular import with projects-tool.ts
+  // (which imports resolveChangesDir and readStatusYaml from this file).
+  const mapPath = resolveProjectMapPath(api);
+  try {
+    const raw = await fs.readFile(mapPath, "utf8");
+    const parsed = parseYaml(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) return null;
+    const projects = (parsed as { projects?: unknown[] }).projects;
+    if (!Array.isArray(projects)) return null;
+    const entry = projects.find(
+      (e) =>
+        e &&
+        typeof e === "object" &&
+        (String((e as Record<string, unknown>).projectCode ?? "") === projectCode ||
+          String((e as Record<string, unknown>).name ?? "") === projectCode),
+    ) as Record<string, unknown> | undefined;
+    if (!entry) return null;
+    const location = String(entry.location ?? entry.path ?? "");
+    return location ? expandTilde(location) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find which project workspace contains a given changeId by scanning all projects
+ * in the project map. Used to route non-"create" actions to the right project dir.
+ */
+async function resolveWorkspaceDirForChange(
+  api: OpenClawPluginApi,
+  changeId: string,
+): Promise<string | null> {
+  const mapPath = resolveProjectMapPath(api);
+  try {
+    const raw = await fs.readFile(mapPath, "utf8");
+    const parsed = parseYaml(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) return null;
+    const projects = (parsed as { projects?: unknown[] }).projects;
+    if (!Array.isArray(projects)) return null;
+    for (const e of projects) {
+      if (!e || typeof e !== "object") continue;
+      const entry = e as Record<string, unknown>;
+      const location = String(entry.location ?? entry.path ?? "");
+      if (!location) continue;
+      const projectDir = expandTilde(location);
+      const changeDir = path.join(projectDir, "openspec", "changes", changeId);
+      const statusPath = path.join(changeDir, "status.yaml");
+      try {
+        await fs.access(statusPath);
+        return projectDir;
+      } catch {
+        // not in this project
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function resolveChangesDir(workspaceDir: string): string {
@@ -231,6 +307,101 @@ async function writeStatusYaml(changeDir: string, change: OpenSpecChange): Promi
   await fs.writeFile(statusPath, stringifySimpleYaml(yamlData), "utf8");
 }
 
+/** Template content for shared-memory files that don't yet exist. */
+const SHARED_MEMORY_TEMPLATES: Record<string, string> = {
+  "project-context.md": `# Project Context
+
+## Product Purpose
+
+<!-- What problem does this product solve? Who uses it? -->
+
+## Architecture Overview
+
+<!-- Key technical components and how they connect -->
+
+## Constraints
+
+<!-- Business rules, compliance requirements, technical limits -->
+
+## Open Questions
+
+<!-- Unresolved decisions that affect the project -->
+`,
+  "decision-log.md": `# Decision Log
+
+<!-- Format for each entry:
+## YYYY-MM-DD: <decision title>
+**Change:** <change-id or "global">
+**Decision:** <what was decided>
+**Rationale:** <why>
+**Alternatives considered:** <what else was considered>
+**Decided by:** <role>
+-->
+`,
+  "mistake-log.md": `# Mistake Log
+
+<!-- Format for each entry:
+## YYYY-MM-DD: <brief description>
+**Change:** <change-id>
+**What happened:** <concrete description of what went wrong>
+**Root cause:** <why it happened>
+**Fix applied:** <what was done to fix it>
+**Prevention:** <what should happen instead>
+**Logged by:** <role>
+-->
+`,
+  "lessons-learned.md": `# Lessons Learned
+
+<!-- Reusable guidance distilled from mistake-log.md entries.
+     Only add lessons here when they are durable and reusable, not incident-specific.
+
+Format:
+## <lesson title>
+**Applies to:** <which roles / phases>
+**Guidance:** <the lesson in one or two sentences>
+**Source:** <mistake-log entry date + title>
+-->
+`,
+  "handoff-index.md": `# Handoff Index
+
+<!-- Quick index of active handoffs. Updated whenever a handoff.md is written.
+
+Format:
+| change-id | phase | from | to | updated | stale? |
+|-----------|-------|------|-----|---------|--------|
+-->
+`,
+  "project-risks.md": `# Project Risks
+
+<!-- Format:
+## <risk title>
+**Likelihood:** high | medium | low
+**Impact:** high | medium | low
+**Owner:** <role>
+**Mitigation:** <what is being done>
+**Status:** open | mitigated | closed
+-->
+`,
+};
+
+/**
+ * Scaffold shared-memory template files that don't exist yet.
+ * Called on change `create` so the directory is ready for agents on first use.
+ */
+async function scaffoldSharedMemory(workspaceDir: string): Promise<void> {
+  const sharedMemoryDir = resolveSharedMemoryDir(workspaceDir);
+  await fs.mkdir(sharedMemoryDir, { recursive: true });
+  for (const [filename, content] of Object.entries(SHARED_MEMORY_TEMPLATES)) {
+    const filePath = path.join(sharedMemoryDir, filename);
+    try {
+      await fs.access(filePath);
+      // File already exists — leave it untouched
+    } catch {
+      await fs.writeFile(filePath, content, "utf8");
+    }
+  }
+}
+
 async function updateCurrentFocus(workspaceDir: string, change: OpenSpecChange): Promise<void> {
   const sharedMemoryDir = resolveSharedMemoryDir(workspaceDir);
   await fs.mkdir(sharedMemoryDir, { recursive: true });
@@ -273,41 +444,83 @@ async function fileHasContent(p: string, minBytes = 1): Promise<boolean> {
   }
 }
 
+/**
+ * Ordered phase sequence. "blocked" is a state, not a sequence position.
+ * Transitions must move forward along this sequence (or to "blocked" from anywhere).
+ * No phase may be skipped.
+ */
+const PHASE_ORDER: OpenSpecPhase[] = [
+  "idea",
+  "proposal",
+  "plan",
+  "design",
+  "implementation",
+  "verification",
+  "deployment",
+  "done",
+];
+
 async function validatePhaseTransition(
   changeDir: string,
+  fromPhase: OpenSpecPhase,
   toPhase: OpenSpecPhase,
 ): Promise<string | null> {
-  // Phase guards: return an error message if the transition is not allowed.
+  // "blocked" can be entered from any phase; unblocking returns to the same phase.
+  if (toPhase === "blocked") return null;
+
+  // Enforce forward-only, no-skip transitions.
+  if (fromPhase !== "blocked") {
+    const fromIdx = PHASE_ORDER.indexOf(fromPhase);
+    const toIdx = PHASE_ORDER.indexOf(toPhase);
+    if (toIdx <= fromIdx) {
+      return `Cannot transition from "${fromPhase}" to "${toPhase}": phases must advance forward in sequence (${PHASE_ORDER.join(" → ")})`;
+    }
+    if (toIdx - fromIdx > 1) {
+      const expected = PHASE_ORDER[fromIdx + 1];
+      return `Cannot skip from "${fromPhase}" to "${toPhase}": next required phase is "${expected}"`;
+    }
+  }
+
+  // Artifact guards: required files must exist before entering each phase.
+  if (toPhase === "proposal") {
+    // No artifact required to enter proposal — it is the first writing phase.
+  }
+  if (toPhase === "plan") {
+    const proposalPath = path.join(changeDir, "proposal.md");
+    if (!(await fileHasContent(proposalPath))) {
+      return `Cannot transition to "plan": proposal.md must exist and have content`;
+    }
+  }
   if (toPhase === "design") {
     const proposalPath = path.join(changeDir, "proposal.md");
-    if (!(await fileExists(proposalPath))) {
-      return `Cannot transition to "design": proposal.md does not exist in ${changeDir}`;
+    if (!(await fileHasContent(proposalPath))) {
+      return `Cannot transition to "design": proposal.md must exist and have content`;
     }
   }
   if (toPhase === "implementation") {
     const designPath = path.join(changeDir, "design.md");
     const tasksPath = path.join(changeDir, "tasks.md");
-    if (!(await fileExists(designPath))) {
-      return `Cannot transition to "implementation": design.md does not exist in ${changeDir}`;
+    if (!(await fileHasContent(designPath))) {
+      return `Cannot transition to "implementation": design.md must exist and have content. Complete the design phase first.`;
     }
-    if (!(await fileExists(tasksPath))) {
-      return `Cannot transition to "implementation": tasks.md does not exist in ${changeDir}`;
+    if (!(await fileHasContent(tasksPath))) {
+      return `Cannot transition to "implementation": tasks.md must exist and have content. Complete the plan phase first.`;
     }
   }
   if (toPhase === "verification") {
     const handoffPath = path.join(changeDir, "handoff.md");
     if (!(await fileHasContent(handoffPath))) {
-      return `Cannot transition to "verification": handoff.md is empty or missing in ${changeDir}`;
+      return `Cannot transition to "verification": handoff.md must be written by the implementer first`;
     }
   }
   if (toPhase === "deployment") {
     const verificationPath = path.join(changeDir, "verification.md");
     if (!(await fileExists(verificationPath))) {
-      return `Cannot transition to "deployment": verification.md does not exist in ${changeDir}`;
+      return `Cannot transition to "deployment": verification.md does not exist`;
     }
     const verificationContent = await fs.readFile(verificationPath, "utf8");
     if (!verificationContent.includes("Signoff: YES")) {
-      return `Cannot transition to "deployment": verification.md does not contain "Signoff: YES"`;
+      return `Cannot transition to "deployment": verification.md does not contain "Signoff: YES" — QA has not signed off`;
     }
   }
   return null;
@@ -325,6 +538,21 @@ async function handleCreate(
   workspaceDir: string,
   input: Extract<OpenSpecChangeInput, { action: "create" }>,
 ): Promise<string> {
+  // New changes always start at "idea" — no agent may create a change already
+  // in an advanced phase, which would bypass the phase-gate enforcement.
+  const allowedCreatePhases: OpenSpecPhase[] = ["idea", "proposal"];
+  const startPhase: OpenSpecPhase = input.phase ?? "idea";
+  if (!allowedCreatePhases.includes(startPhase)) {
+    return JSON.stringify(
+      {
+        ok: false,
+        error: `Cannot create a change at phase "${startPhase}". New changes must start at "idea" or "proposal". Use openspec_change(transition) to advance phases in order.`,
+      },
+      null,
+      2,
+    );
+  }
+
   const changeDir = resolveChangeDir(workspaceDir, input.changeId);
   await fs.mkdir(changeDir, { recursive: true });
 
@@ -332,7 +560,7 @@ async function handleCreate(
   const change: OpenSpecChange = {
     changeId: input.changeId,
     title: input.title,
-    phase: input.phase ?? "idea",
+    phase: startPhase,
     owner: "",
     assignees: {},
     blockers: [],
@@ -344,6 +572,7 @@ async function handleCreate(
   };
 
   await writeStatusYaml(changeDir, change);
+  await scaffoldSharedMemory(workspaceDir);
   await updateCurrentFocus(workspaceDir, change);
 
   return JSON.stringify({ ok: true, change }, null, 2);
@@ -359,7 +588,7 @@ async function handleTransition(
     return JSON.stringify({ ok: false, error: `Change ${input.changeId} not found` }, null, 2);
   }
 
-  const guardError = await validatePhaseTransition(changeDir, input.toPhase);
+  const guardError = await validatePhaseTransition(changeDir, change.phase, input.toPhase);
   if (guardError) {
     return JSON.stringify({ ok: false, error: guardError }, null, 2);
   }
@@ -560,9 +789,21 @@ export function createOpenSpecChangeTool(api: OpenClawPluginApi) {
       }
 
       const input = parseResult.data;
-      const workspaceDir = resolveWorkspaceDir(api);
 
       try {
+        // Resolve the project workspace directory from project-map.yaml when possible.
+        // - "create" supplies projectCode directly, resolved via project-map.yaml.
+        // - All other actions scan project-map.yaml for the project that owns changeId.
+        // Falls back to the agent default workspace if project-map resolution fails.
+        let workspaceDir: string;
+        if (input.action === "create") {
+          const resolved = await resolveWorkspaceDirForProject(api, input.projectCode);
+          workspaceDir = resolved ?? resolveWorkspaceDir(api);
+        } else {
+          const resolved = await resolveWorkspaceDirForChange(api, input.changeId);
+          workspaceDir = resolved ?? resolveWorkspaceDir(api);
+        }
+
         let resultText: string;
         switch (input.action) {
           case "create":

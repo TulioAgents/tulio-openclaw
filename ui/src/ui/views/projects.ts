@@ -244,6 +244,10 @@ function renderProjectsStyles() {
         background: rgba(128, 128, 128, 0.12);
         color: var(--color-text-muted, #888);
       }
+      .projects-view__project-status--closed {
+        background: rgba(128, 128, 128, 0.08);
+        color: var(--color-text-muted, #aaa);
+      }
       .projects-view__agents-section {
         margin-top: 28px;
         padding-top: 20px;
