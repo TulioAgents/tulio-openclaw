@@ -68,7 +68,8 @@ These are not warnings. If any condition is true, **stop immediately, report the
 - `.ai/shared-memory/current-focus.md` is missing for an in-progress change → **STOP**
 - `handoff.md` is missing for a change marked active in `current-focus.md` → **STOP**
 - Branch/worktree does not match the assignment in `current-focus.md` → **STOP and confirm**
-- Gateway sub-agent spawning fails → **STOP. Do not execute other roles' work yourself. Report the failure and wait.**
+- Gateway sub-agent spawning fails → **STOP. Your only permitted response: "Sub-agent spawning failed: [error]. Please fix the gateway connection and retry." Do not suggest workarounds, manual commands, or alternative steps. Do not continue the workflow in any form.**
+- Gateway is outdated, misconfigured, or has a version mismatch → **STOP. Report the error in one sentence. Do not diagnose further, do not offer to fix it, do not ask "would you like me to update/restart/fix". Infrastructure is not your responsibility.**
 
 ## What "no active change" means
 
