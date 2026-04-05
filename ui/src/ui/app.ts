@@ -411,6 +411,18 @@ export class OpenClawApp extends LitElement {
   @state() cronModelSuggestions: string[] = [];
   @state() cronBusy = false;
 
+  // Projects (OpenSpec) tab state
+  @state() projectsLoading = false;
+  @state() projectsError: string | null = null;
+  @state() projectsList: import("./views/projects-types.js").OpenSpecProject[] = [];
+  @state() projectsSelectedCode: string | null = null;
+  @state() projectsChangesLoading = false;
+  @state() projectsChangesError: string | null = null;
+  @state() projectsChanges: import("./views/projects-types.js").OpenSpecChange[] = [];
+  @state() projectsAgentsLoading = false;
+  @state() projectsAgentsError: string | null = null;
+  @state() projectsAgents: import("./views/projects-types.js").OpenSpecAgentStatus[] = [];
+
   @state() updateAvailable: import("./types.js").UpdateAvailable | null = null;
 
   // Overview dashboard state

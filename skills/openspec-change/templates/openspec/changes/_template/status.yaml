@@ -1,0 +1,12 @@
+changeId: ""
+title: ""
+projectCode: ""
+phase: idea  # idea | proposal | plan | design | implementation | verification | deployment | done | blocked
+owner: ""
+assignees: {}
+branch: ""
+worktree: ""
+blockers: []
+createdAt: ""
+updatedAt: ""
+flowId: ""

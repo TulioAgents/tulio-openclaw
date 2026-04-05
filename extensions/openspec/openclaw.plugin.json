@@ -1,0 +1,32 @@
+{
+  "id": "openspec",
+  "enabledByDefault": true,
+  "name": "OpenSpec",
+  "description": "OpenSpec multi-agent development system for managing changes, phases, and agent coordination.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "projectMapPath": {
+        "type": "string",
+        "default": "~/coding-projects/project-map.yaml",
+        "description": "Path to the global project-map.yaml registry"
+      },
+      "missionControlUrl": {
+        "type": "string",
+        "default": "http://localhost:4010",
+        "description": "Base URL for the Mission Control API"
+      }
+    }
+  },
+  "uiHints": {
+    "projectMapPath": {
+      "label": "Project Map Path",
+      "help": "Path to the global project-map.yaml registry file. Supports ~ for home directory."
+    },
+    "missionControlUrl": {
+      "label": "Mission Control URL",
+      "help": "Base URL for the Mission Control API server."
+    }
+  }
+}

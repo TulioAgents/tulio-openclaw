@@ -22,6 +22,7 @@ import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
+import { loadProjectsTab } from "./controllers/projects.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import { loadUsage } from "./controllers/usage.ts";
@@ -322,6 +323,9 @@ export async function refreshActiveTab(host: SettingsHost) {
     host.logsAtBottom = true;
     await loadLogs(host as unknown as OpenClawApp, { reset: true });
     scheduleLogsScroll(host as unknown as Parameters<typeof scheduleLogsScroll>[0], true);
+  }
+  if (host.tab === "projects") {
+    await loadProjectsTab(host as unknown as OpenClawApp);
   }
 }
 

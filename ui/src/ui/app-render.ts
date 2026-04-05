@@ -83,6 +83,7 @@ import {
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
+import { loadProjectsTab, selectProject } from "./controllers/projects.ts";
 import {
   branchSessionFromCheckpoint,
   deleteSessionsAndRefresh,
@@ -161,6 +162,7 @@ const lazyLogs = createLazy(() => import("./views/logs.ts"));
 const lazyNodes = createLazy(() => import("./views/nodes.ts"));
 const lazySessions = createLazy(() => import("./views/sessions.ts"));
 const lazySkills = createLazy(() => import("./views/skills.ts"));
+const lazyProjects = createLazy(() => import("./views/projects.ts"));
 
 function formatDreamNextCycle(nextRunAtMs: number | undefined): string | null {
   if (typeof nextRunAtMs !== "number" || !Number.isFinite(nextRunAtMs)) {
@@ -2145,6 +2147,31 @@ export function renderApp(state: AppViewState) {
               onToggleEnabled: applyDreamingEnabled,
               onRequestUpdate: requestHostUpdate,
             })
+          : nothing}
+        ${state.tab === "projects"
+          ? lazyRender(lazyProjects, (m) =>
+              m.renderProjects({
+                loading: state.projectsLoading,
+                error: state.projectsError,
+                projects: state.projectsList,
+                selectedProjectCode: state.projectsSelectedCode,
+                changes: state.projectsChanges,
+                changesLoading: state.projectsChangesLoading,
+                changesError: state.projectsChangesError,
+                agents: state.projectsAgents,
+                agentsLoading: state.projectsAgentsLoading,
+                agentsError: state.projectsAgentsError,
+                onRefresh: () => {
+                  void loadProjectsTab(state);
+                },
+                onSelectProject: (projectCode: string) => {
+                  void selectProject(state, projectCode);
+                },
+                onChangeSelect: (_change) => {
+                  // Detail panel can be wired up in a follow-up iteration.
+                },
+              }),
+            )
           : nothing}
       </main>
       ${renderExecApprovalPrompt(state)} ${renderGatewayUrlConfirmation(state)} ${nothing}

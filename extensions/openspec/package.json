@@ -1,0 +1,16 @@
+{
+  "name": "@openclaw/openspec",
+  "version": "2026.4.4",
+  "private": true,
+  "description": "OpenSpec multi-agent development system plugin",
+  "type": "module",
+  "dependencies": {
+    "yaml": "^2.6.1"
+  },
+  "openclaw": {
+    "id": "openspec",
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -40,6 +40,13 @@ function resolveNearestAcpxPluginRoot(moduleUrl: string): string {
     if (isAcpxPluginRoot(cursor)) {
       return cursor;
     }
+    // When config is bundled into a shared chunk in dist/ or dist-runtime/, the module
+    // URL points to the bundle dir rather than the plugin dir. Check for the plugin
+    // as a sibling at <bundleDir>/extensions/acpx.
+    const siblingPluginRoot = path.join(cursor, "extensions", "acpx");
+    if (isAcpxPluginRoot(siblingPluginRoot)) {
+      return siblingPluginRoot;
+    }
     const parent = path.dirname(cursor);
     if (parent === cursor) {
       break;
@@ -50,10 +57,11 @@ function resolveNearestAcpxPluginRoot(moduleUrl: string): string {
 }
 
 function resolveWorkspaceAcpxPluginRoot(currentRoot: string): string | null {
+  const distDir = path.basename(path.dirname(path.dirname(currentRoot)));
   if (
     path.basename(currentRoot) !== "acpx" ||
     path.basename(path.dirname(currentRoot)) !== "extensions" ||
-    path.basename(path.dirname(path.dirname(currentRoot))) !== "dist"
+    (distDir !== "dist" && distDir !== "dist-runtime")
   ) {
     return null;
   }

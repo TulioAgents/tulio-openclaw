@@ -1,0 +1,186 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { GatewayRequestHandlerOptions } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "../runtime-api.js";
+import { resolveChangesDir, readStatusYaml } from "./openspec-tool.js";
+import type { OpenSpecAgentStatus, OpenSpecChange, OpenSpecProject } from "./openspec-types.js";
+import {
+  readProjectMap,
+  resolveProjectMapPath,
+  resolveProjectLocation,
+  countActiveChanges,
+  expandTildeProjects,
+} from "./projects-tool.js";
+
+/** Read all changes for a project from its changes directory. */
+async function listChangesForProject(projectLocation: string): Promise<OpenSpecChange[]> {
+  const changesDir = resolveChangesDir(projectLocation);
+  const changes: OpenSpecChange[] = [];
+  try {
+    const entries = await fs.readdir(changesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      const changeDir = path.join(changesDir, entry.name);
+      const change = await readStatusYaml(changeDir);
+      if (change) {
+        changes.push(change);
+      }
+    }
+  } catch {
+    // Directory may not exist yet
+  }
+  return changes;
+}
+
+/** Find a change by changeId across a project's changes directory. */
+async function findChange(
+  projectLocation: string,
+  changeId: string,
+): Promise<OpenSpecChange | null> {
+  const changeDir = path.join(resolveChangesDir(projectLocation), changeId);
+  return readStatusYaml(changeDir);
+}
+
+/** Read artifact files (*.md) from a change directory. */
+async function readChangeArtifacts(
+  projectLocation: string,
+  changeId: string,
+): Promise<Record<string, string>> {
+  const changeDir = path.join(resolveChangesDir(projectLocation), changeId);
+  const artifacts: Record<string, string> = {};
+  try {
+    const entries = await fs.readdir(changeDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) {
+        continue;
+      }
+      try {
+        const content = await fs.readFile(path.join(changeDir, entry.name), "utf8");
+        artifacts[entry.name] = content;
+      } catch {
+        // skip unreadable
+      }
+    }
+  } catch {
+    // changeDir may not exist
+  }
+  return artifacts;
+}
+
+export function createOpenSpecGatewayHandlers(api: OpenClawPluginApi) {
+  /** openspec.projects.list — returns all projects with activeChanges count */
+  const handleProjectsList = async (opts: GatewayRequestHandlerOptions): Promise<void> => {
+    try {
+      const mapPath = resolveProjectMapPath(api);
+      const projectMap = await readProjectMap(mapPath);
+      const projects: OpenSpecProject[] = await Promise.all(
+        projectMap.projects.map(async (entry) => {
+          const location = expandTildeProjects(entry.location);
+          const activeChanges = await countActiveChanges(location);
+          return {
+            projectCode: entry.projectCode,
+            projectName: entry.projectName,
+            location,
+            status: entry.status,
+            activeChanges,
+          };
+        }),
+      );
+      opts.respond(true, { projects });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      opts.respond(false, undefined, { code: "openspec.error", message });
+    }
+  };
+
+  /** openspec.changes.list — returns changes for a project */
+  const handleChangesList = async (opts: GatewayRequestHandlerOptions): Promise<void> => {
+    const projectCode =
+      typeof opts.params.projectCode === "string" ? opts.params.projectCode.trim() : "";
+    if (!projectCode) {
+      opts.respond(false, undefined, {
+        code: "openspec.missing_param",
+        message: "projectCode is required",
+      });
+      return;
+    }
+    try {
+      const location = await resolveProjectLocation(api, projectCode);
+      if (!location) {
+        opts.respond(false, undefined, {
+          code: "openspec.not_found",
+          message: `Project ${projectCode} not found`,
+        });
+        return;
+      }
+      const changes = await listChangesForProject(location);
+      opts.respond(true, { changes });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      opts.respond(false, undefined, { code: "openspec.error", message });
+    }
+  };
+
+  /** openspec.changes.detail — returns a single change with artifact content */
+  const handleChangesDetail = async (opts: GatewayRequestHandlerOptions): Promise<void> => {
+    const projectCode =
+      typeof opts.params.projectCode === "string" ? opts.params.projectCode.trim() : "";
+    const changeId = typeof opts.params.changeId === "string" ? opts.params.changeId.trim() : "";
+
+    if (!projectCode || !changeId) {
+      opts.respond(false, undefined, {
+        code: "openspec.missing_param",
+        message: "projectCode and changeId are required",
+      });
+      return;
+    }
+    try {
+      const location = await resolveProjectLocation(api, projectCode);
+      if (!location) {
+        opts.respond(false, undefined, {
+          code: "openspec.not_found",
+          message: `Project ${projectCode} not found`,
+        });
+        return;
+      }
+      const change = await findChange(location, changeId);
+      if (!change) {
+        opts.respond(false, undefined, {
+          code: "openspec.not_found",
+          message: `Change ${changeId} not found`,
+        });
+        return;
+      }
+      const artifacts = await readChangeArtifacts(location, changeId);
+      opts.respond(true, { change, artifacts });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      opts.respond(false, undefined, { code: "openspec.error", message });
+    }
+  };
+
+  /**
+   * openspec.agents.status — returns active agent statuses
+   *
+   * TODO: The plugin SDK does not expose a public surface for querying active
+   * subagent sessions by sessionKey prefix. This implementation returns an
+   * empty array as a placeholder. To implement fully, a plugin SDK seam would
+   * need to expose session listing filtered by sessionKey pattern
+   * (e.g. "agent:openspec:*").
+   */
+  const handleAgentsStatus = async (opts: GatewayRequestHandlerOptions): Promise<void> => {
+    // TODO: Query active sessions matching sessionKey prefix "agent:openspec:*"
+    // when the plugin SDK exposes a session listing seam.
+    const agents: OpenSpecAgentStatus[] = [];
+    opts.respond(true, { agents });
+  };
+
+  return {
+    handleProjectsList,
+    handleChangesList,
+    handleChangesDetail,
+    handleAgentsStatus,
+  };
+}

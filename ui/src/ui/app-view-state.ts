@@ -39,6 +39,11 @@ import type {
 } from "./types.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
+import type {
+  OpenSpecAgentStatus,
+  OpenSpecChange,
+  OpenSpecProject,
+} from "./views/projects-types.ts";
 import type { SessionLogEntry } from "./views/usage.ts";
 
 export type AppViewState = {
@@ -330,6 +335,16 @@ export type AppViewState = {
     logsLimit: number;
     logsMaxBytes: number;
     logsAtBottom: boolean;
+    projectsLoading: boolean;
+    projectsError: string | null;
+    projectsList: OpenSpecProject[];
+    projectsSelectedCode: string | null;
+    projectsChangesLoading: boolean;
+    projectsChangesError: string | null;
+    projectsChanges: OpenSpecChange[];
+    projectsAgentsLoading: boolean;
+    projectsAgentsError: string | null;
+    projectsAgents: OpenSpecAgentStatus[];
     updateAvailable: import("./types.js").UpdateAvailable | null;
     attentionItems: AttentionItem[];
     paletteOpen: boolean;
