@@ -1,0 +1,69 @@
+{
+  "id": "learning-core",
+  "kind": "plugin",
+  "uiHints": {
+    "enabled": {
+      "label": "Self-Learning",
+      "help": "Enable automatic skill discovery from repeated workflows."
+    },
+    "mode": {
+      "label": "Learning Mode",
+      "placeholder": "suggest",
+      "help": "off: disabled. suggest: generates candidates for manual review. auto: promotes high-confidence candidates automatically."
+    },
+    "fingerprint.minOccurrences": {
+      "label": "Min Occurrences",
+      "placeholder": "3",
+      "help": "How many times a tool sequence must repeat before a skill draft is generated."
+    },
+    "fingerprint.minSessions": {
+      "label": "Min Sessions",
+      "placeholder": "2",
+      "help": "How many distinct sessions must show the pattern before triggering extraction."
+    },
+    "limits.maxCandidatesPerDay": {
+      "label": "Max Candidates / Day",
+      "placeholder": "5",
+      "help": "Maximum number of skill draft candidates generated per workspace per day."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["off", "suggest", "auto"]
+      },
+      "fingerprint": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "minOccurrences": { "type": "number", "minimum": 1 },
+          "minSessions": { "type": "number", "minimum": 1 }
+        }
+      },
+      "limits": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxCandidatesPerDay": { "type": "number", "minimum": 0 },
+          "maxExtractionsPerSession": { "type": "number", "minimum": 0 },
+          "maxTraceEntries": { "type": "number", "minimum": 100 }
+        }
+      },
+      "triggers": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userSessions": { "type": "boolean" },
+          "cronSessions": { "type": "boolean" },
+          "heartbeatSessions": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

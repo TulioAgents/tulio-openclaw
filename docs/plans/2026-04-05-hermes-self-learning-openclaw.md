@@ -315,3 +315,29 @@ Compatibility rules:
 - Draft learnings persist immediately, but active prompt/session content does not change until the next refresh boundary.
 - Existing `MEMORY.md`, `USER.md`, `memory_search`, `memory_get`, skills snapshotting, and plugin hooks are preserved and extended rather than replaced.
 - UI work is optional for v1; CLI plus tool-accessible review flow is sufficient for the first release.
+
+---
+
+I think we need to breack down the tasks into indivitual files like :
+
+~/coding-projects/helloworld4/openspec/{feature}/tasks/
+
+- Phase1-T1.1.md
+- Phase1-T1.2.md
+- Phase1-T1.3.md
+- Phase{x}-T{Y}.{z}}.md
+- Phase{x}-T{Y}.{z}}.md
+
+example
+
+~/coding-projects/helloworld4/openspec/0001-name-capture-greeting-display/tasks/
+
+- Phase1-T1.1.md
+- Phase2-T2.2.md
+- Phase2-T2.3.md
+- Phase2-T2.4.md
+- Phase3-T3.1.md
+- Phase3-T3.2.md
+- Phase{x}-T{Y}.{z}}.md
+
+Inside each task a full details of the work to be done, and space to agents write commentes similar to JIRA type, so when the task it';s reasiigned to another agent roles, have contect about that task. also any bug should be reported there before asignes to a dev

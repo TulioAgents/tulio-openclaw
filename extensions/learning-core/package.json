@@ -1,0 +1,23 @@
+{
+  "name": "@openclaw/learning-core",
+  "version": "2026.4.5",
+  "private": true,
+  "description": "OpenClaw self-learning plugin: observes workflows, generates draft skills, and supports human-gated promotion",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.4"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
