@@ -52,6 +52,9 @@ export default definePluginEntry({
     api.registerGatewayMethod("openspec.tasks.list", gatewayHandlers.handleTasksList, {
       scope: "operator.read",
     });
+    api.registerGatewayMethod("openspec.changes.can-advance", gatewayHandlers.handleCanAdvance, {
+      scope: "operator.read",
+    });
 
     // Register the lifecycle service
     api.registerService(createOpenSpecService());

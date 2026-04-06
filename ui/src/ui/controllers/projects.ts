@@ -3,6 +3,7 @@ import type {
   OpenSpecAgentStatus,
   OpenSpecChange,
   OpenSpecProject,
+  TaskTrackerEntry,
 } from "../views/projects-types.ts";
 
 export type ProjectsState = {
@@ -18,6 +19,9 @@ export type ProjectsState = {
   projectsAgentsLoading: boolean;
   projectsAgentsError: string | null;
   projectsAgents: OpenSpecAgentStatus[];
+  projectsSelectedChange: OpenSpecChange | null;
+  projectsSelectedChangeTasks: TaskTrackerEntry[];
+  projectsChangeDetailLoading: boolean;
 };
 
 /** Load the list of OpenSpec projects from the gateway. */
@@ -35,8 +39,13 @@ export async function loadProjects(state: ProjectsState): Promise<void> {
       projects?: OpenSpecProject[];
     };
     state.projectsList = result?.projects ?? [];
-    // Auto-select the first project if nothing is selected yet.
-    if (!state.projectsSelectedCode && state.projectsList.length > 0) {
+    // Auto-select the first project if nothing is selected yet, or if the
+    // currently selected code is no longer in the list (e.g. stale state from
+    // a previous session pointing at a project that no longer exists).
+    const selectedIsValid = state.projectsList.some(
+      (p) => p.projectCode === state.projectsSelectedCode,
+    );
+    if (!selectedIsValid && state.projectsList.length > 0) {
       state.projectsSelectedCode = state.projectsList[0].projectCode;
     }
   } catch (err) {
@@ -108,5 +117,34 @@ export async function selectProject(state: ProjectsState, projectCode: string): 
   state.projectsChangesError = null;
   state.projectsAgents = [];
   state.projectsAgentsError = null;
+  state.projectsSelectedChange = null;
+  state.projectsSelectedChangeTasks = [];
   await Promise.all([loadProjectChanges(state), loadProjectAgents(state)]);
+}
+
+/** Open a change's detail panel and load its tasks. */
+export async function selectChange(state: ProjectsState, change: OpenSpecChange): Promise<void> {
+  // Toggle off if same card clicked again
+  if (state.projectsSelectedChange?.changeId === change.changeId) {
+    state.projectsSelectedChange = null;
+    state.projectsSelectedChangeTasks = [];
+    return;
+  }
+  state.projectsSelectedChange = change;
+  state.projectsSelectedChangeTasks = [];
+  if (!state.client || !state.connected || !state.projectsSelectedCode) {
+    return;
+  }
+  state.projectsChangeDetailLoading = true;
+  try {
+    const result = (await state.client.request("openspec.tasks.list", {
+      projectCode: state.projectsSelectedCode,
+      changeId: change.changeId,
+    })) as { tasks?: TaskTrackerEntry[] };
+    state.projectsSelectedChangeTasks = result?.tasks ?? [];
+  } catch {
+    state.projectsSelectedChangeTasks = [];
+  } finally {
+    state.projectsChangeDetailLoading = false;
+  }
 }

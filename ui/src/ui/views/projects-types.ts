@@ -24,6 +24,18 @@ export interface OpenSpecChange {
   projectCode: string;
 }
 
+export interface TaskTrackerEntry {
+  id: string;
+  title: string;
+  status: "todo" | "in_progress" | "blocked" | "in_review" | "done";
+  assignee: string;
+  role: string;
+  owner: string;
+  reviewer: string;
+  priority: "low" | "medium" | "high" | "critical";
+  dependsOn: string[];
+}
+
 export interface OpenSpecAgentStatus {
   sessionKey: string;
   role: string;

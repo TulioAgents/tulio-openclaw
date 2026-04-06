@@ -83,7 +83,7 @@ import {
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
-import { loadProjectsTab, selectProject } from "./controllers/projects.ts";
+import { loadProjectsTab, selectChange, selectProject } from "./controllers/projects.ts";
 import {
   branchSessionFromCheckpoint,
   deleteSessionsAndRefresh,
@@ -2161,14 +2161,17 @@ export function renderApp(state: AppViewState) {
                 agents: state.projectsAgents,
                 agentsLoading: state.projectsAgentsLoading,
                 agentsError: state.projectsAgentsError,
+                selectedChange: state.projectsSelectedChange,
+                selectedChangeTasks: state.projectsSelectedChangeTasks,
+                changeDetailLoading: state.projectsChangeDetailLoading,
                 onRefresh: () => {
                   void loadProjectsTab(state);
                 },
                 onSelectProject: (projectCode: string) => {
                   void selectProject(state, projectCode);
                 },
-                onChangeSelect: (_change) => {
-                  // Detail panel can be wired up in a follow-up iteration.
+                onChangeSelect: (change) => {
+                  void selectChange(state, change);
                 },
               }),
             )

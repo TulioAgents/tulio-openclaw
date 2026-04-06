@@ -422,6 +422,9 @@ export class OpenClawApp extends LitElement {
   @state() projectsAgentsLoading = false;
   @state() projectsAgentsError: string | null = null;
   @state() projectsAgents: import("./views/projects-types.js").OpenSpecAgentStatus[] = [];
+  @state() projectsSelectedChange: import("./views/projects-types.js").OpenSpecChange | null = null;
+  @state() projectsSelectedChangeTasks: import("./views/projects-types.js").TaskTrackerEntry[] = [];
+  @state() projectsChangeDetailLoading = false;
 
   @state() updateAvailable: import("./types.js").UpdateAvailable | null = null;
 

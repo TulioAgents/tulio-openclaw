@@ -345,6 +345,9 @@ export type AppViewState = {
     projectsAgentsLoading: boolean;
     projectsAgentsError: string | null;
     projectsAgents: OpenSpecAgentStatus[];
+    projectsSelectedChange: OpenSpecChange | null;
+    projectsSelectedChangeTasks: import("./views/projects-types.js").TaskTrackerEntry[];
+    projectsChangeDetailLoading: boolean;
     updateAvailable: import("./types.js").UpdateAvailable | null;
     attentionItems: AttentionItem[];
     paletteOpen: boolean;

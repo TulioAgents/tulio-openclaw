@@ -37,7 +37,30 @@ Run the `project-bootstrap` skill:
 - Read `.ai/shared-memory/current-focus.md`
 - Check `openspec/changes/` for existing work
 
-### 2. Check artifact state
+### 2. Phase gate — HARD STOP
+
+**Call the can-advance endpoint before doing anything else. Do not create any files if it returns `canAdvance: false`.**
+
+```bash
+openclaw call openspec.changes.can-advance \
+  '{ "projectCode": "<project-code>", "changeId": "<change-id>" }'
+```
+
+Expected response before planning:
+
+```json
+{
+  "canAdvance": true,
+  "currentPhase": "proposal",
+  "nextPhase": "plan",
+  "checks": [{ "name": "proposal.md exists with content", "pass": true }],
+  "blockers": []
+}
+```
+
+If `canAdvance` is `false`: **STOP. Report each item in `blockers` to the task owner and wait.**
+
+### 3. Check artifact state
 
 ```bash
 cd <project-root>
@@ -149,3 +172,4 @@ Write `openspec/changes/<change-id>/handoff.md` pointing to the first task owner
 - [ ] Worktree created and branch set
 - [ ] `handoff.md` initialized with first owner
 - [ ] `current-focus.md` updated
+- [ ] `openclaw call openspec.changes.can-advance` returns `canAdvance: true` and `nextPhase: "implementation"` before handing off

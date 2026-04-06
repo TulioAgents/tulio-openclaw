@@ -11,6 +11,7 @@ import {
 import type {
   OpenSpecAgentStatus,
   OpenSpecChange,
+  OpenSpecPhase,
   OpenSpecProject,
   TaskTrackerEntry,
 } from "./openspec-types.js";
@@ -77,6 +78,131 @@ async function readChangeArtifacts(
     // changeDir may not exist
   }
   return artifacts;
+}
+
+interface PhaseCheck {
+  name: string;
+  pass: boolean;
+}
+
+interface CanAdvanceResult {
+  canAdvance: boolean;
+  nextPhase: OpenSpecPhase | null;
+  checks: PhaseCheck[];
+  blockers: string[];
+}
+
+const PHASE_ORDER: OpenSpecPhase[] = [
+  "idea",
+  "proposal",
+  "plan",
+  "design",
+  "implementation",
+  "verification",
+  "deployment",
+  "done",
+];
+
+async function fileHasContent(filePath: string): Promise<boolean> {
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    return content.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function dirHasFiles(dirPath: string): Promise<boolean> {
+  try {
+    const entries = await fs.readdir(dirPath);
+    return entries.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function fileContains(filePath: string, text: string): Promise<boolean> {
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    return content.includes(text);
+  } catch {
+    return false;
+  }
+}
+
+/** Pure deterministic phase gate — reads only files, no agent calls. */
+async function checkCanAdvance(
+  changeDir: string,
+  currentPhase: OpenSpecPhase,
+): Promise<CanAdvanceResult> {
+  const idx = PHASE_ORDER.indexOf(currentPhase);
+  const nextPhase: OpenSpecPhase | null =
+    idx >= 0 && idx < PHASE_ORDER.length - 1 ? PHASE_ORDER[idx + 1] : null;
+
+  if (!nextPhase || currentPhase === "done" || currentPhase === "blocked") {
+    return { canAdvance: false, nextPhase, checks: [], blockers: ["Phase is terminal"] };
+  }
+
+  const checks: PhaseCheck[] = [];
+
+  switch (currentPhase) {
+    case "idea": {
+      const pass = await fileHasContent(path.join(changeDir, "proposal.md"));
+      checks.push({ name: "proposal.md exists with content", pass });
+      break;
+    }
+    case "proposal": {
+      const pass = await fileHasContent(path.join(changeDir, "tasks.md"));
+      checks.push({ name: "tasks.md exists with content", pass });
+      break;
+    }
+    case "plan": {
+      const tasksMd = await fileHasContent(path.join(changeDir, "tasks.md"));
+      const trackerYaml = await fileHasContent(path.join(changeDir, "tasks-tracker.yaml"));
+      const tasksDir = await dirHasFiles(path.join(changeDir, "tasks"));
+      checks.push({ name: "tasks.md exists with content", pass: tasksMd });
+      checks.push({ name: "tasks-tracker.yaml exists with content", pass: trackerYaml });
+      checks.push({ name: "tasks/ directory has task files", pass: tasksDir });
+      break;
+    }
+    case "design": {
+      const designMd = await fileHasContent(path.join(changeDir, "design.md"));
+      const tasksMd = await fileHasContent(path.join(changeDir, "tasks.md"));
+      checks.push({ name: "design.md exists with content", pass: designMd });
+      checks.push({ name: "tasks.md exists with content", pass: tasksMd });
+      break;
+    }
+    case "implementation": {
+      const handoffMd = await fileHasContent(path.join(changeDir, "handoff.md"));
+      checks.push({ name: "handoff.md exists with content", pass: handoffMd });
+      // All tasks in tracker must be done
+      const tracker = await readTaskTracker(changeDir);
+      if (tracker && tracker.tasks.length > 0) {
+        const allDone = tracker.tasks.every((t) => t.status === "done");
+        const pendingCount = tracker.tasks.filter((t) => t.status !== "done").length;
+        checks.push({
+          name: `all tasks done in tasks-tracker.yaml (${tracker.tasks.length - pendingCount}/${tracker.tasks.length})`,
+          pass: allDone,
+        });
+      } else {
+        checks.push({ name: "tasks-tracker.yaml has tasks", pass: false });
+      }
+      break;
+    }
+    case "verification": {
+      const signoff = await fileContains(path.join(changeDir, "verification.md"), "Signoff: YES");
+      checks.push({ name: 'verification.md contains "Signoff: YES"', pass: signoff });
+      break;
+    }
+    case "deployment": {
+      const releaseMd = await fileHasContent(path.join(changeDir, "release.md"));
+      checks.push({ name: "release.md exists with content", pass: releaseMd });
+      break;
+    }
+  }
+
+  const blockers = checks.filter((c) => !c.pass).map((c) => c.name);
+  return { canAdvance: blockers.length === 0, nextPhase, checks, blockers };
 }
 
 export function createOpenSpecGatewayHandlers(api: OpenClawPluginApi) {
@@ -227,6 +353,58 @@ export function createOpenSpecGatewayHandlers(api: OpenClawPluginApi) {
     }
   };
 
+  /** openspec.changes.can-advance — deterministic phase gate check (zero agent tokens) */
+  const handleCanAdvance = async (opts: GatewayRequestHandlerOptions): Promise<void> => {
+    const projectCode =
+      typeof opts.params.projectCode === "string" ? opts.params.projectCode.trim() : "";
+    const changeId = typeof opts.params.changeId === "string" ? opts.params.changeId.trim() : "";
+
+    if (!projectCode || !changeId) {
+      opts.respond(false, undefined, {
+        code: "openspec.missing_param",
+        message: "projectCode and changeId are required",
+      });
+      return;
+    }
+
+    try {
+      const location = await resolveProjectLocation(api, projectCode);
+      if (!location) {
+        opts.respond(false, undefined, {
+          code: "openspec.not_found",
+          message: `Project ${projectCode} not found`,
+        });
+        return;
+      }
+
+      const changeDir = path.join(resolveChangesDir(location), changeId);
+      const change = await readStatusYaml(changeDir);
+      if (!change) {
+        opts.respond(false, undefined, {
+          code: "openspec.not_found",
+          message: `Change ${changeId} not found`,
+        });
+        return;
+      }
+
+      const { canAdvance, nextPhase, checks, blockers } = await checkCanAdvance(
+        changeDir,
+        change.phase,
+      );
+
+      opts.respond(true, {
+        canAdvance,
+        currentPhase: change.phase,
+        nextPhase,
+        checks,
+        blockers,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      opts.respond(false, undefined, { code: "openspec.error", message });
+    }
+  };
+
   /**
    * openspec.agents.status — returns active agent statuses
    *
@@ -249,5 +427,6 @@ export function createOpenSpecGatewayHandlers(api: OpenClawPluginApi) {
     handleChangesDetail,
     handleAgentsStatus,
     handleTasksList,
+    handleCanAdvance,
   };
 }

@@ -35,15 +35,35 @@ These are hard stops. If any condition is true, **stop immediately. Do not write
 
 ### 1. Bootstrap and verify phase gate
 
-Run the `project-bootstrap` skill, then **verify all of the following before touching any code**:
+Run the `project-bootstrap` skill, then **call the can-advance endpoint first — this is a hard gate**:
 
 ```bash
-cd <project-root>
+openclaw call openspec.changes.can-advance \
+  '{ "projectCode": "<project-code>", "changeId": "<change-id>" }'
+```
+
+Expected response before implementing:
+
+```json
+{
+  "canAdvance": true,
+  "currentPhase": "plan",
+  "nextPhase": "implementation",
+  "checks": [
+    { "name": "tasks.md exists with content", "pass": true },
+    { "name": "tasks-tracker.yaml exists with content", "pass": true },
+    { "name": "tasks/ directory has task files", "pass": true }
+  ],
+  "blockers": []
+}
+```
+
+**If `canAdvance` is `false`: STOP. Do not write any code. Report each item in `blockers` to the plan owner and wait.**
+
+Also verify:
+
+```bash
 cat openspec/changes/<change-id>/status.yaml     # phase MUST be "implementation"
-cat openspec/changes/<change-id>/proposal.md     # MUST exist and have content
-cat openspec/changes/<change-id>/design.md       # MUST exist and have content
-cat openspec/changes/<change-id>/tasks.md        # MUST exist and have content
-openspec status --change "<change-id>" --json    # confirm all artifacts ready
 ```
 
 **If `status.yaml` phase is not `"implementation"`, stop here.** Use `openspec_change(transition)` only after the prior phase owner has completed their artifact — do not self-transition.
