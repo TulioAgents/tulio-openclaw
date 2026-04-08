@@ -28,6 +28,8 @@ These are hard stops. If any condition is true, **stop immediately. Do not write
 - `proposal.md` is missing or empty → **STOP. The proposal phase has not completed.**
 - `design.md` is missing or empty → **STOP. The design phase has not completed.**
 - `tasks.md` is missing or empty → **STOP. The plan phase has not completed.**
+- `tasks-tracker.yaml` is missing or empty → **STOP. The plan phase has not completed. `tasks-tracker.yaml` must exist before implementation. Return to @dev-manager to run `openspec-plan-change` and call `openspec_task(task_create)` for each task.**
+- `tasks/` directory is missing or contains no task files → **STOP. The plan phase has not completed. Individual task files under `tasks/` must exist before implementation. A markdown checklist in `tasks.md` alone is NOT sufficient. Return to @dev-manager.**
 - `status.yaml` phase is not `"implementation"` → **STOP. The change has not been transitioned to implementation. Do not begin coding.**
 - Gateway sub-agent spawning failed → **STOP. Do not execute this role's work from a parent/orchestrator session.**
 

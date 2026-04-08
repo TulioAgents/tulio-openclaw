@@ -1,5 +1,17 @@
 # Repository Guidelines
 
+## Workflow Checkpoint
+
+Before any action — including reading more of this file — answer these questions:
+
+1. Is the project registered in `~/coding-projects/project-map.yaml`? If not: **STOP.** Tell the user. Do not create it.
+2. Is there an active OpenSpec change in `openspec/changes/` with a `status.yaml` not in `done`? If not: **STOP.** Register one with `openspec_change(create)` at phase `idea`, wait for confirmation.
+3. Are you about to write code? Is `status.yaml` showing `phase: implementation`? If not: **STOP.** Return to the correct phase owner.
+4. Did sub-agent spawning fail? **STOP.** Respond only with: `"Sub-agent spawning failed: [error]. Please fix the gateway connection and retry."` Nothing else.
+5. Is infrastructure broken (gateway down, CLI version mismatch)? **STOP.** One sentence report, then wait. Infrastructure is not your responsibility.
+
+---
+
 - Repo: https://github.com/openclaw/openclaw
 - In chat replies, file references must be repo-root relative only (example: `src/telegram/index.ts:80`); never absolute paths or `~/...`.
 - Do not edit files covered by security-focused `CODEOWNERS` rules unless a listed owner explicitly asked for the change or is already reviewing it with you. Treat those paths as restricted surfaces, not drive-by cleanup.

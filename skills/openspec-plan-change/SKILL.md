@@ -164,12 +164,31 @@ Write `openspec/changes/<change-id>/handoff.md` pointing to the first task owner
 - Branch and worktree location
 - Any known blockers or dependencies
 
+## Pre-handoff verification — REQUIRED
+
+Before writing the handoff or transitioning to implementation, verify all of the following with shell commands. Do not rely on memory or assumption.
+
+```bash
+# 1. tasks-tracker.yaml must exist and have content
+cat openspec/changes/<change-id>/tasks-tracker.yaml
+
+# 2. tasks/ directory must exist and contain at least one .md file
+ls openspec/changes/<change-id>/tasks/*.md
+
+# 3. tasks.md must be an index table with links to task files (not a checklist)
+grep -c "\[Phase" openspec/changes/<change-id>/tasks.md
+```
+
+**If any of these checks fails: do not hand off. Fix the gap first.**
+
+A `tasks.md` that contains only a markdown checklist (`- [ ] B-1: ...`) is NOT sufficient. It must be an index table with `[Phase{X}-{ID}.md](tasks/Phase{X}-{ID}.md)` links pointing to real files. The dashboard reads `tasks-tracker.yaml` and `tasks/*.md` — not `tasks.md` prose.
+
 ## Done when
 
-- [ ] Individual task files exist under `tasks/` (one per task)
-- [ ] `tasks-tracker.yaml` populated with all tasks
-- [ ] `tasks.md` updated as index table with links to task files
+- [ ] Individual task files exist under `tasks/` (one per task) — verified with `ls tasks/*.md`
+- [ ] `tasks-tracker.yaml` populated with all tasks — verified with `cat tasks-tracker.yaml`
+- [ ] `tasks.md` is an index table with links to task files (not a checklist)
 - [ ] Worktree created and branch set
 - [ ] `handoff.md` initialized with first owner
 - [ ] `current-focus.md` updated
-- [ ] `openclaw call openspec.changes.can-advance` returns `canAdvance: true` and `nextPhase: "implementation"` before handing off
+- [ ] Pre-handoff verification commands above all passed

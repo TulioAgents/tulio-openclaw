@@ -41,24 +41,40 @@ This creates the repo on `main`, adds a `.gitignore`, and makes an initial commi
 
 **If the project exists but has no active change, STOP.** Call `openspec_change(create)` to register the change at phase `"idea"`, then wait for human confirmation before proceeding to any phase work. Do not infer what to build and start coding.
 
+## Change size routing
+
+Before entering the lifecycle, the PO must classify the change. The lifecycle adapts based on size:
+
+| Size    | Criteria                         | Phases required                                                                |
+| ------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| trivial | 1 task, no API/schema changes    | idea → implementation → done (skip proposal, plan, design, verification)       |
+| small   | 2–5 tasks, no schema changes     | idea → proposal → plan → implementation → verification → done (skip design)    |
+| medium  | 5–15 tasks, API/schema changes   | Full lifecycle                                                                 |
+| epic    | >15 tasks or multiple subsystems | **STOP. Do not start.** PO must decompose into multiple smaller changes first. |
+
+**Never enter the lifecycle with an epic-sized change. Decompose first.**
+
 ## The OpenSpec Lifecycle
 
 ```
 [Idea]          → create change (phase: idea)
+                → PO classifies size: trivial | small | medium | epic
+                → epic → STOP, decompose
   ↓
-[Proposal]      → product-owner writes proposal.md
+[Proposal]      → product-owner writes proposal.md (skip for trivial)
                 → transition to "plan" only after proposal.md has content
   ↓
 [Plan]          → dev-manager writes tasks.md, handoff.md
+                → validates every task has: objective, includes, excludes, done-when, dependencies
                 → transition to "design" only after tasks.md has content
   ↓
-[Design]        → tech-lead writes design.md
+[Design]        → tech-lead writes design.md (skip for trivial and small)
                 → transition to "implementation" only after design.md AND tasks.md have content
   ↓
 [Implementation]→ sr-fullstack writes code + tests + handoff.md
                 → transition to "verification" only after handoff.md has content
   ↓
-[Verification]  → qa-engineer writes verification.md with "Signoff: YES"
+[Verification]  → qa-engineer writes verification.md with "Signoff: YES" (skip for trivial)
                 → transition to "deployment" only after "Signoff: YES" in verification.md
   ↓
 [Deployment]    → devops deploys, writes release.md
