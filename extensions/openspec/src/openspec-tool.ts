@@ -93,8 +93,8 @@ function resolveProjectMapPath(api: OpenClawPluginApi): string {
     typeof api.pluginConfig === "object" &&
     api.pluginConfig !== null &&
     "projectMapPath" in api.pluginConfig &&
-    typeof (api.pluginConfig as Record<string, unknown>).projectMapPath === "string"
-      ? ((api.pluginConfig as Record<string, unknown>).projectMapPath as string)
+    typeof api.pluginConfig.projectMapPath === "string"
+      ? api.pluginConfig.projectMapPath
       : "~/coding-projects/project-map.yaml";
   return expandTilde(raw);
 }
@@ -109,18 +109,31 @@ async function resolveWorkspaceDirForProject(
   try {
     const raw = await fs.readFile(mapPath, "utf8");
     const parsed = parseYaml(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) return null;
+    if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) {
+      return null;
+    }
     const projects = (parsed as { projects?: unknown[] }).projects;
-    if (!Array.isArray(projects)) return null;
-    const entry = projects.find(
-      (e) =>
-        e &&
-        typeof e === "object" &&
-        (String((e as Record<string, unknown>).projectCode ?? "") === projectCode ||
-          String((e as Record<string, unknown>).name ?? "") === projectCode),
-    ) as Record<string, unknown> | undefined;
-    if (!entry) return null;
-    const location = String(entry.location ?? entry.path ?? "");
+    if (!Array.isArray(projects)) {
+      return null;
+    }
+    const entry = projects.find((e) => {
+      if (!e || typeof e !== "object") {
+        return false;
+      }
+      const r = e as Record<string, unknown>;
+      const code = typeof r.projectCode === "string" ? r.projectCode : "";
+      const name = typeof r.name === "string" ? r.name : "";
+      return code === projectCode || name === projectCode;
+    }) as Record<string, unknown> | undefined;
+    if (!entry) {
+      return null;
+    }
+    const location =
+      typeof entry.location === "string"
+        ? entry.location
+        : typeof entry.path === "string"
+          ? entry.path
+          : "";
     return location ? expandTilde(location) : null;
   } catch {
     return null;
@@ -139,14 +152,27 @@ async function resolveWorkspaceDirForChange(
   try {
     const raw = await fs.readFile(mapPath, "utf8");
     const parsed = parseYaml(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) return null;
+    if (!parsed || typeof parsed !== "object" || !("projects" in parsed)) {
+      return null;
+    }
     const projects = (parsed as { projects?: unknown[] }).projects;
-    if (!Array.isArray(projects)) return null;
+    if (!Array.isArray(projects)) {
+      return null;
+    }
     for (const e of projects) {
-      if (!e || typeof e !== "object") continue;
+      if (!e || typeof e !== "object") {
+        continue;
+      }
       const entry = e as Record<string, unknown>;
-      const location = String(entry.location ?? entry.path ?? "");
-      if (!location) continue;
+      const location =
+        typeof entry.location === "string"
+          ? entry.location
+          : typeof entry.path === "string"
+            ? entry.path
+            : "";
+      if (!location) {
+        continue;
+      }
       const projectDir = expandTilde(location);
       const changeDir = path.join(projectDir, "openspec", "changes", changeId);
       const statusPath = path.join(changeDir, "status.yaml");
@@ -213,7 +239,7 @@ function stringifySimpleYaml(obj: Record<string, unknown>): string {
       } else {
         lines.push(`${key}:`);
         for (const [k, v] of entries) {
-          lines.push(`  ${k}: ${JSON.stringify(String(v ?? ""))}`);
+          lines.push(`  ${k}: ${JSON.stringify(typeof v === "string" ? v : (v ?? ""))}`);
         }
       }
     }
@@ -228,7 +254,7 @@ function parseSimpleYaml(raw: string): Record<string, unknown> {
   const lines = raw.split("\n");
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i]!;
+    const line = lines[i];
     if (!line.trim() || line.trim().startsWith("#")) {
       i += 1;
       continue;
@@ -245,13 +271,13 @@ function parseSimpleYaml(raw: string): Record<string, unknown> {
       // Could be a block value (array or object)
       const children: string[] = [];
       i += 1;
-      while (i < lines.length && (lines[i]!.startsWith("  ") || lines[i]!.startsWith("\t"))) {
-        children.push(lines[i]!.trim());
+      while (i < lines.length && (lines[i].startsWith("  ") || lines[i].startsWith("\t"))) {
+        children.push(lines[i].trim());
         i += 1;
       }
       if (children.length === 0) {
         result[key] = null;
-      } else if (children[0]!.startsWith("- ")) {
+      } else if (children[0].startsWith("- ")) {
         result[key] = children.map((c) => {
           const val = c.slice(2).trim();
           try {
@@ -475,7 +501,9 @@ async function validatePhaseTransition(
   toPhase: OpenSpecPhase,
 ): Promise<string | null> {
   // "blocked" can be entered from any phase; unblocking returns to the same phase.
-  if (toPhase === "blocked") return null;
+  if (toPhase === "blocked") {
+    return null;
+  }
 
   // Enforce forward-only, no-skip transitions.
   if (fromPhase !== "blocked") {
@@ -515,7 +543,9 @@ async function validatePhaseTransition(
     const tasksPath = path.join(changeDir, "tasks.md");
     const tasksDir = path.join(changeDir, "tasks");
     const hasTasks = await (async () => {
-      if (await fileHasContent(tasksPath)) return true;
+      if (await fileHasContent(tasksPath)) {
+        return true;
+      }
       try {
         const entries = await fs.readdir(tasksDir);
         return entries.some((f) => f.endsWith(".md") && f !== "TEMPLATE.md");
@@ -777,22 +807,22 @@ function taskFromFrontmatter(fm: Record<string, unknown>): OpenSpecTask {
     Array.isArray(v) ? v.map(String) : typeof v === "string" && v ? [v] : [];
 
   return {
-    id: String(fm.id ?? ""),
-    title: String(fm.title ?? ""),
-    phase: String(fm.phase ?? ""),
+    id: typeof fm.id === "string" ? fm.id : "",
+    title: typeof fm.title === "string" ? fm.title : "",
+    phase: typeof fm.phase === "string" ? fm.phase : "",
     status: (fm.status as TaskStatus) ?? "todo",
     priority: (fm.priority as TaskPriority) ?? "medium",
-    assignee: String(fm.assignee ?? ""),
-    role: String(fm.role ?? ""),
-    owner: String(fm.owner ?? ""),
-    reviewer: String(fm.reviewer ?? ""),
+    assignee: typeof fm.assignee === "string" ? fm.assignee : "",
+    role: typeof fm.role === "string" ? fm.role : "",
+    owner: typeof fm.owner === "string" ? fm.owner : "",
+    reviewer: typeof fm.reviewer === "string" ? fm.reviewer : "",
     dependsOn: arr(fm.depends_on),
     blockedBy: arr(fm.blocked_by),
-    createdAt: String(fm.created_at ?? ""),
-    updatedAt: String(fm.updated_at ?? ""),
-    startedAt: String(fm.started_at ?? ""),
-    completedAt: String(fm.completed_at ?? ""),
-    estimatedEffort: String(fm.estimated_effort ?? ""),
+    createdAt: typeof fm.created_at === "string" ? fm.created_at : "",
+    updatedAt: typeof fm.updated_at === "string" ? fm.updated_at : "",
+    startedAt: typeof fm.started_at === "string" ? fm.started_at : "",
+    completedAt: typeof fm.completed_at === "string" ? fm.completed_at : "",
+    estimatedEffort: typeof fm.estimated_effort === "string" ? fm.estimated_effort : "",
   };
 }
 
@@ -823,7 +853,9 @@ async function readTaskFile(
   try {
     const content = await fs.readFile(filePath, "utf8");
     const { frontmatter, body } = parseMarkdownFrontmatter(content);
-    if (!frontmatter.id) return null;
+    if (!frontmatter.id) {
+      return null;
+    }
     return { task: taskFromFrontmatter(frontmatter), body };
   } catch {
     return null;
@@ -843,11 +875,13 @@ async function listTaskFiles(changeDir: string): Promise<OpenSpecTask[]> {
   const tasksDir = resolveTasksDir(changeDir);
   try {
     const entries = await fs.readdir(tasksDir);
-    const taskFiles = entries.filter((f) => f.endsWith(".md") && f !== "TEMPLATE.md").sort(); // alphabetical = Phase order
+    const taskFiles = entries.filter((f) => f.endsWith(".md") && f !== "TEMPLATE.md").toSorted(); // alphabetical = Phase order
     const tasks: OpenSpecTask[] = [];
     for (const filename of taskFiles) {
       const result = await readTaskFile(path.join(tasksDir, filename));
-      if (result) tasks.push(result.task);
+      if (result) {
+        tasks.push(result.task);
+      }
     }
     return tasks;
   } catch {
@@ -860,11 +894,13 @@ async function readTaskTracker(changeDir: string): Promise<TaskTracker | null> {
   try {
     const raw = await fs.readFile(trackerPath, "utf8");
     const parsed = parseYaml(raw) as Record<string, unknown> | null;
-    if (!parsed) return null;
+    if (!parsed) {
+      return null;
+    }
     const tasks = Array.isArray(parsed.tasks) ? (parsed.tasks as TaskTrackerEntry[]) : [];
     return {
-      changeId: String(parsed.changeId ?? ""),
-      updatedAt: String(parsed.updatedAt ?? ""),
+      changeId: typeof parsed.changeId === "string" ? parsed.changeId : "",
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : "",
       tasks,
     };
   } catch {
@@ -1066,7 +1102,9 @@ async function handleTaskUpdate(
   try {
     const entries = await fs.readdir(tasksDir);
     for (const filename of entries) {
-      if (!filename.endsWith(".md") || filename === "TEMPLATE.md") continue;
+      if (!filename.endsWith(".md") || filename === "TEMPLATE.md") {
+        continue;
+      }
       const fp = path.join(tasksDir, filename);
       const result = await readTaskFile(fp);
       if (result && result.task.id === input.id) {
@@ -1091,14 +1129,26 @@ async function handleTaskUpdate(
   // Apply updates
   const now = new Date().toISOString();
   if (input.status !== undefined) {
-    if (input.status === "in_progress" && !task.startedAt) task.startedAt = now;
-    if (input.status === "done" && !task.completedAt) task.completedAt = now;
+    if (input.status === "in_progress" && !task.startedAt) {
+      task.startedAt = now;
+    }
+    if (input.status === "done" && !task.completedAt) {
+      task.completedAt = now;
+    }
     task.status = input.status;
   }
-  if (input.assignee !== undefined) task.assignee = input.assignee;
-  if (input.reviewer !== undefined) task.reviewer = input.reviewer;
-  if (input.priority !== undefined) task.priority = input.priority;
-  if (input.blockedBy !== undefined) task.blockedBy = input.blockedBy;
+  if (input.assignee !== undefined) {
+    task.assignee = input.assignee;
+  }
+  if (input.reviewer !== undefined) {
+    task.reviewer = input.reviewer;
+  }
+  if (input.priority !== undefined) {
+    task.priority = input.priority;
+  }
+  if (input.blockedBy !== undefined) {
+    task.blockedBy = input.blockedBy;
+  }
   task.updatedAt = now;
 
   await writeTaskFile(taskFilePath, task, existingBody);
@@ -1120,7 +1170,9 @@ async function handleTaskComment(
   try {
     const entries = await fs.readdir(tasksDir);
     for (const filename of entries) {
-      if (!filename.endsWith(".md") || filename === "TEMPLATE.md") continue;
+      if (!filename.endsWith(".md") || filename === "TEMPLATE.md") {
+        continue;
+      }
       const fp = path.join(tasksDir, filename);
       const result = await readTaskFile(fp);
       if (result && result.task.id === input.id) {
@@ -1183,7 +1235,9 @@ async function handleTaskBug(
   try {
     const entries = await fs.readdir(tasksDir);
     for (const filename of entries) {
-      if (!filename.endsWith(".md") || filename === "TEMPLATE.md") continue;
+      if (!filename.endsWith(".md") || filename === "TEMPLATE.md") {
+        continue;
+      }
       const fp = path.join(tasksDir, filename);
       const result = await readTaskFile(fp);
       if (result && result.task.id === input.id) {

@@ -17,10 +17,9 @@ import { logVerbose } from "openclaw/plugin-sdk/runtime-env";
 import type { TraceEntry } from "./types.js";
 
 const EXTRACTION_TIMEOUT_MS = 60_000;
-const MAX_TRANSCRIPT_CHARS_PER_RUN = 6_000;
+const _MAX_TRANSCRIPT_CHARS_PER_RUN = 6_000;
 const MAX_RUNS_FOR_CONTEXT = 3;
 const EXTRACTION_MAX_TOKENS = 2_048;
-const EXTRACTION_TEMPERATURE = 0.2;
 
 const EXTRACTION_SYSTEM_PROMPT = `You analyze repeated agent workflows and generate reusable skill definitions.
 Reply ONLY with a single JSON object — no markdown fences, no prose.`;
@@ -116,11 +115,11 @@ function parseExtractionResponse(raw: string): ExtractionResult | null {
 
   try {
     const parsed = JSON.parse(text) as ExtractionRaw;
-    const name = String(parsed.name ?? "").trim();
-    const description = String(parsed.description ?? "").trim();
-    const body = String(parsed.body ?? "").trim();
+    const name = (typeof parsed.name === "string" ? parsed.name : "").trim();
+    const description = (typeof parsed.description === "string" ? parsed.description : "").trim();
+    const body = (typeof parsed.body === "string" ? parsed.body : "").trim();
     const confidence = Math.min(1, Math.max(0, Number(parsed.confidence ?? 0)));
-    const reasoning = String(parsed.reasoning ?? "").trim();
+    const reasoning = (typeof parsed.reasoning === "string" ? parsed.reasoning : "").trim();
 
     if (!name || !description || !body) {
       return null;
@@ -216,7 +215,6 @@ export async function extractSkillFromWorkflow(params: {
       },
       options: {
         maxTokens: EXTRACTION_MAX_TOKENS,
-        temperature: EXTRACTION_TEMPERATURE,
         signal: controller.signal,
       },
     });

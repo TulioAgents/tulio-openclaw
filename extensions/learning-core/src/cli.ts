@@ -265,8 +265,14 @@ function resolveWorkspaceDir(override?: string): string {
 }
 
 function statusBadge(status: string): string {
-  if (status === "pending") return "[pending]";
-  if (status === "promoted") return "[promoted]";
-  if (status === "rejected") return "[rejected]";
+  if (status === "pending") {
+    return "[pending]";
+  }
+  if (status === "promoted") {
+    return "[promoted]";
+  }
+  if (status === "rejected") {
+    return "[rejected]";
+  }
   return `[${status}]`;
 }

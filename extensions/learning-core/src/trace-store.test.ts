@@ -84,7 +84,7 @@ describe("appendTrace", () => {
     const content = await fs.readFile(path.join(tmpDir, "learning", "traces.jsonl"), "utf8");
     const lines = content.trim().split("\n");
     expect(lines).toHaveLength(3);
-    const last = JSON.parse(lines[lines.length - 1]!) as TraceEntry;
+    const last = JSON.parse(lines[lines.length - 1]) as TraceEntry;
     expect(last.runId).toBe("run-4");
   });
 });

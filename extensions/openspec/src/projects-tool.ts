@@ -43,8 +43,8 @@ function resolveProjectMapPath(api: OpenClawPluginApi): string {
     typeof api.pluginConfig === "object" &&
     api.pluginConfig !== null &&
     "projectMapPath" in api.pluginConfig &&
-    typeof (api.pluginConfig as Record<string, unknown>).projectMapPath === "string"
-      ? ((api.pluginConfig as Record<string, unknown>).projectMapPath as string)
+    typeof api.pluginConfig.projectMapPath === "string"
+      ? api.pluginConfig.projectMapPath
       : "~/coding-projects/project-map.yaml";
   return expandTilde(rawPath);
 }
@@ -52,9 +52,20 @@ function resolveProjectMapPath(api: OpenClawPluginApi): string {
 /** Normalize a raw project-map entry to canonical field names. */
 function normalizeProjectMapEntry(raw: Record<string, unknown>): ProjectMapEntry {
   // Support both canonical (projectCode/projectName/location) and legacy (name/path) field names.
-  const location = String(raw.location ?? raw.path ?? "");
-  const projectName = String(raw.projectName ?? raw.name ?? location);
-  const projectCode = String(raw.projectCode ?? raw.name ?? projectName);
+  const location =
+    typeof raw.location === "string" ? raw.location : typeof raw.path === "string" ? raw.path : "";
+  const projectName =
+    typeof raw.projectName === "string"
+      ? raw.projectName
+      : typeof raw.name === "string"
+        ? raw.name
+        : location;
+  const projectCode =
+    typeof raw.projectCode === "string"
+      ? raw.projectCode
+      : typeof raw.name === "string"
+        ? raw.name
+        : projectName;
   const status = (raw.status ?? "active") as ProjectMapEntry["status"];
   return { projectName, projectCode, location, status };
 }

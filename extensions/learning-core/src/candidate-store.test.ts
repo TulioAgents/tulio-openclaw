@@ -95,11 +95,11 @@ describe("listCandidates", () => {
 
     const pending = await listCandidates(tmpDir, "pending");
     expect(pending).toHaveLength(1);
-    expect(pending[0]!.skillName).toBe("skill-a");
+    expect(pending[0].skillName).toBe("skill-a");
 
     const promoted = await listCandidates(tmpDir, "promoted");
     expect(promoted).toHaveLength(1);
-    expect(promoted[0]!.skillName).toBe("skill-b");
+    expect(promoted[0].skillName).toBe("skill-b");
 
     void c1;
     void c2;

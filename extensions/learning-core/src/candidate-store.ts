@@ -73,7 +73,9 @@ export async function listCandidates(
     const entries = await fs.readdir(dir);
     const candidates: SkillCandidate[] = [];
     for (const entry of entries) {
-      if (!entry.endsWith(".json")) continue;
+      if (!entry.endsWith(".json")) {
+        continue;
+      }
       try {
         const raw = await fs.readFile(path.join(dir, entry), "utf8");
         const c = JSON.parse(raw) as SkillCandidate;

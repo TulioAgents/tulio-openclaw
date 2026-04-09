@@ -20,7 +20,6 @@ import {
   computeFingerprint,
   incrementDailyCount,
   markFingerprintCandidated,
-  markFingerprintPromoted,
   markFingerprintRevision,
   recordFingerprint,
   readTracesForFingerprint,
@@ -39,9 +38,15 @@ const sessionExtractionDone = new Set<string>();
 
 function isTriggerAllowed(trigger: string | undefined, cfg: LearningConfig): boolean {
   const t = trigger ?? "user";
-  if (t === "user") return cfg.triggers.userSessions;
-  if (t === "cron") return cfg.triggers.cronSessions;
-  if (t === "heartbeat") return cfg.triggers.heartbeatSessions;
+  if (t === "user") {
+    return cfg.triggers.userSessions;
+  }
+  if (t === "cron") {
+    return cfg.triggers.cronSessions;
+  }
+  if (t === "heartbeat") {
+    return cfg.triggers.heartbeatSessions;
+  }
   return false;
 }
 
@@ -54,7 +59,9 @@ export function registerObserverHooks(
   // Note: PluginHookToolContext does not include trigger — we check it in agent_end.
   api.on("after_tool_call", (event, ctx) => {
     const cfg = getConfig();
-    if (!cfg.enabled || cfg.mode === "off") return;
+    if (!cfg.enabled || cfg.mode === "off") {
+      return;
+    }
 
     const runId = ctx.runId ?? "unknown";
     const toolName = (event as { toolName?: string }).toolName ?? "unknown";
@@ -70,8 +77,12 @@ export function registerObserverHooks(
   // ── agent_end: flush trace + optionally trigger extraction ────────────────
   api.on("agent_end", (event, ctx) => {
     const cfg = getConfig();
-    if (!cfg.enabled || cfg.mode === "off") return;
-    if (!isTriggerAllowed(ctx.trigger, cfg)) return;
+    if (!cfg.enabled || cfg.mode === "off") {
+      return;
+    }
+    if (!isTriggerAllowed(ctx.trigger, cfg)) {
+      return;
+    }
 
     const runId = ctx.runId ?? "unknown";
     const sessionKey = ctx.sessionKey ?? "unknown";
@@ -153,10 +164,16 @@ async function processTrace(
       entry.count - entry.countAtPromotion >= REVISION_OCCURRENCE_DELTA;
 
     // Skip if: not yet at threshold AND not a revision opportunity
-    if (belowThreshold && !isRevisionEligible) return;
+    if (belowThreshold && !isRevisionEligible) {
+      return;
+    }
     // Skip if: initial candidate pending (not promoted yet) OR already has pending revision
-    if (hasInitialCandidate && !promotedSkillPath && !isRevisionEligible) return;
-    if (entry.revisionCandidateId) return;
+    if (hasInitialCandidate && !promotedSkillPath && !isRevisionEligible) {
+      return;
+    }
+    if (entry.revisionCandidateId) {
+      return;
+    }
 
     // Per-session extraction limit
     if (sessionExtractionDone.has(sessionKey)) {
